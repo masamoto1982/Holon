@@ -1,0 +1,240 @@
+body {
+    margin: 0;
+    padding: 0;
+    height: 100vh;
+}
+
+header{
+	text-align: center;
+	border: 1px dashed #ccc;
+	padding:0.5em;
+}
+
+span {
+	display: block;
+	font-size: 0.1em;
+	color: gray;
+}
+
+article {
+	display:flex;
+    flex-flow: column;
+}
+
+.top {
+    display: flex;
+    justify-content: space-between;
+    gap: 0px;
+}
+
+.output-area {
+    flex: 1;
+    max-width: 50%; /* 横幅を50%に固定 */
+    box-sizing: border-box;
+    overflow: auto;
+    border: 1px dashed #ccc;
+    padding: 0.5em;
+	margin: 0;
+}
+
+#output {
+	width: 100%;
+    height: 200px;
+	border: 1px dashed #ccc;
+	box-sizing: border-box;
+	padding:0.5em;
+	margin-bottom: 0.5em;
+	overflow: auto;
+	position: relative;
+}
+
+.status-area {
+    flex: 1;
+    max-width: 50%; /* 横幅を50%に固定 */
+    box-sizing: border-box;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    border: 1px dashed #ccc;
+    padding: 0.5em;
+}
+
+.stack-area {
+    flex: 1;
+    max-width: 100%; /* 横幅を50%に固定 */
+    box-sizing: border-box;
+    border: 1px dashed #ccc;
+    padding: 0.5em;
+	margin-bottom: 0.5em;
+    height: 150px; /* 固定の高さを設定 */
+    overflow: auto; /* はみ出した場合にスクロールバーを表示 */
+}
+
+.register-area {
+    flex: 1;
+    max-width: 100%; /* 横幅を50%に固定 */
+    box-sizing: border-box;
+    border: 1px dashed #ccc;
+    padding: 0.5em;
+    height: 150px; /* 固定の高さを設定 */
+    overflow: auto; /* はみ出した場合にスクロールバーを表示 */
+}
+
+.bottom {
+    display: flex;
+    justify-content: space-between;
+    gap: 0px;
+}
+
+.input-area {
+    flex: 1;
+    max-width: 50%; /* 横幅を50%に固定 */
+    box-sizing: border-box;
+    overflow: auto;
+    border: 1px dashed #ccc;
+    padding: 0.5em;
+}
+
+#input {
+	width: 100%;
+    height: 200px;
+	border: 1px dashed #ccc;
+	box-sizing: border-box;
+	padding:0.5em;
+	margin-bottom: 0.5em;
+}
+
+.dictionary-area {
+    flex: 1;
+    max-width: 50%; /* 横幅を50%に固定 */
+    box-sizing: border-box;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    border: 1px dashed #ccc;
+    padding: 0.5em;
+}
+
+/* 可変幅にする場合（例：文字数が多い場合） */
+.word-button {
+	margin: 0.2em;
+    border: 1px solid #ccc;
+    background-color: #f9f9f9;
+    cursor: pointer;
+}
+
+.word-button:hover {
+    background-color: #ddd; /* ホバー時の色変更 */
+}
+
+.builtin-words-area {
+	flex: 1;
+    max-width: 100%; /* 横幅を50%に固定 */
+    box-sizing: border-box;
+    border: 1px dashed #ccc;
+    padding: 0.5em;
+	margin-bottom: 0.5em;
+    height: 200px; /* 固定の高さを設定 */
+}
+
+.custom-words-area {
+	flex: 1;
+    max-width: 100%; /* 横幅を50%に固定 */
+    box-sizing: border-box;
+    border: 1px dashed #ccc;
+    padding: 0.5em;
+    height: 200px; /* 固定の高さを設定 */
+}
+
+footer {
+	text-align: center;
+	border: 1px dashed #ccc;
+}
+
+@media (max-width: 480px) {
+
+header {
+	display: none;
+}
+
+ .top {
+    flex-flow: column;
+}
+
+h2 {
+	display: none;
+}
+
+.output-area {
+        flex: 1;
+        max-width: 100%; /* 横幅を100%に固定 */
+        box-sizing: border-box;
+        overflow: auto;
+    }
+	
+#output {
+	margin: 0;
+}
+
+.status-area {
+        flex: 1;
+        max-width: 100%; /* 横幅を100%に固定 */
+        box-sizing: border-box;
+        overflow: auto;
+        display: flex;
+        flex-direction: row;
+        gap: 10px; /* スタックエリアとレジスタエリアの間隔 */
+    }
+
+.stack-area {
+    flex: 1;
+	margin:0 0.5em 0 0;
+}
+
+.register-area {
+    flex: 1;
+	margin:0;
+}
+
+.bottom {
+    display: block;
+}
+
+.input-area {
+    flex: 1;
+    max-width: 100%; /* 横幅を100%に固定 */
+    box-sizing: border-box;
+    overflow: auto;
+}
+
+#input {
+    height: 100px;
+}
+	
+.dictionary-area {
+    flex: 1;
+    max-width: 100%; /* 横幅を100%に固定 */
+    box-sizing: border-box;
+    overflow: auto;
+}
+	
+.stack-area {
+    flex: 1;
+    max-width: 50%; /* 横幅を50%に固定 */
+	height: 90px; /* 固定の高さを設定 */
+    box-sizing: border-box;
+	margin:0;
+}
+
+.register-area {
+    flex: 1;
+    max-width: 50%; /* 横幅を50%に固定 */
+	height: 90px; /* 固定の高さを設定 */
+    box-sizing: border-box;
+}
+
+footer {
+	display: none;
+}
+
+}

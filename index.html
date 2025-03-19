@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Holon</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Holon<span>Ver.202503191920</span></h1>
+    </header>
+    <article>
+        <section class="top">
+            <div class="output-area">
+			<h2>Output</h2>
+                <pre id="output"></pre>
+            </div>
+            <div class="status-area">
+			<h2>Status</h2>
+                <div class="stack-area">
+                    <h3>Stack</h3>
+                    <pre id="stack"></pre>
+                </div>
+                <div class="register-area">
+                    <h3>Register</h3>
+                    <pre id="register"></pre>
+                </div>
+            </div>
+        </section>
+        <section class="bottom">
+            <div class="input-area">
+			<h2>Input</h2>
+				<textarea id="input" placeholder="Enter Holon command"></textarea>
+            </div>
+            <div class="dictionary-area">
+			<h2>Dictionary</h2>
+                <div class="builtin-words-area">
+                    <h3>Built-in Words</h3>
+                    <div id="builtin-words"></div>
+                </div>
+                <div class="custom-words-area">
+                    <h3>Custom Words</h3>
+                    <div id="custom-words"></div>
+                </div>
+            </div>
+        </section>
+    </article>
+    <footer>
+        <p>© 2025 masamoto yamashiro</p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
