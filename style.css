@@ -6,9 +6,26 @@ body {
 
 header{
 	text-align: center;
-	border: 1px dashed #ccc;
 	padding:0.5em;
 }
+
+/* ヘッダーの全体スタイル */
+.header-container {
+    display: flex; /* Flexboxを有効化 */
+    align-items: center; /* 縦方向の中央揃え */
+    justify-content: center; /* 横方向の中央揃え */
+    gap: 10px; /* ロゴとタイトルの間隔 */
+    text-align: left;
+    padding: 0.5em;
+}
+
+
+/* ロゴマークのスタイル */
+.logo {
+    width: 50px; /* ロゴの幅を50pxに固定 */
+    height: 50px; /* ロゴの高さを50pxに固定 */
+}
+
 
 span {
 	display: block;
@@ -32,20 +49,20 @@ article {
     max-width: 50%; /* 横幅を50%に固定 */
     box-sizing: border-box;
     overflow: auto;
-    border: 1px dashed #ccc;
     padding: 0.5em;
 	margin: 0;
+	border: 1px solid #ccc;
 }
 
 #output {
 	width: 100%;
     height: 200px;
-	border: 1px dashed #ccc;
 	box-sizing: border-box;
 	padding:0.5em;
 	margin-bottom: 0.5em;
 	overflow: auto;
 	position: relative;
+	border:1px dotted #ccc;
 }
 
 .status-area {
@@ -55,29 +72,31 @@ article {
     overflow: auto;
     display: flex;
     flex-direction: column;
-    border: 1px dashed #ccc;
     padding: 0.5em;
+	border: 1px solid #ccc;
 }
 
 .stack-area {
     flex: 1;
+	flex-wrap: wrap; /* 子要素が折り返す */
     max-width: 100%; /* 横幅を50%に固定 */
     box-sizing: border-box;
-    border: 1px dashed #ccc;
     padding: 0.5em;
 	margin-bottom: 0.5em;
     height: 150px; /* 固定の高さを設定 */
     overflow: auto; /* はみ出した場合にスクロールバーを表示 */
+	border:1px dotted #ccc;
 }
 
 .register-area {
     flex: 1;
+	flex-wrap: wrap; /* 子要素が折り返す */
     max-width: 100%; /* 横幅を50%に固定 */
     box-sizing: border-box;
-    border: 1px dashed #ccc;
     padding: 0.5em;
     height: 150px; /* 固定の高さを設定 */
     overflow: auto; /* はみ出した場合にスクロールバーを表示 */
+	border:1px dotted #ccc;
 }
 
 .bottom {
@@ -91,17 +110,17 @@ article {
     max-width: 50%; /* 横幅を50%に固定 */
     box-sizing: border-box;
     overflow: auto;
-    border: 1px dashed #ccc;
     padding: 0.5em;
+	border: 1px solid #ccc;
 }
 
 #input {
 	width: 100%;
     height: 200px;
-	border: 1px dashed #ccc;
 	box-sizing: border-box;
 	padding:0.5em;
 	margin-bottom: 0.5em;
+	border:1px dotted #ccc;
 }
 
 .dictionary-area {
@@ -111,16 +130,16 @@ article {
     overflow: auto;
     display: flex;
     flex-direction: column;
-    border: 1px dashed #ccc;
     padding: 0.5em;
+	border: 1px solid #ccc;
 }
 
 /* 可変幅にする場合（例：文字数が多い場合） */
 .word-button {
 	margin: 0.2em;
-    border: 1px solid #ccc;
     background-color: #f9f9f9;
     cursor: pointer;
+	border: 1px solid #ccc;
 }
 
 .word-button:hover {
@@ -129,26 +148,28 @@ article {
 
 .builtin-words-area {
 	flex: 1;
+	flex-wrap: wrap; /* 子要素が折り返す */
     max-width: 100%; /* 横幅を50%に固定 */
     box-sizing: border-box;
-    border: 1px dashed #ccc;
     padding: 0.5em;
 	margin-bottom: 0.5em;
-    height: 200px; /* 固定の高さを設定 */
+	border:1px dotted #ccc;
+
 }
 
 .custom-words-area {
 	flex: 1;
+	flex-wrap: wrap; /* 子要素が折り返す */
     max-width: 100%; /* 横幅を50%に固定 */
     box-sizing: border-box;
-    border: 1px dashed #ccc;
     padding: 0.5em;
     height: 200px; /* 固定の高さを設定 */
+	border:1px dotted #ccc;
+
 }
 
 footer {
 	text-align: center;
-	border: 1px dashed #ccc;
 }
 
 @media (max-width: 480px) {

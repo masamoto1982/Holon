@@ -175,6 +175,62 @@ const builtinWords = {
         description: "Loads register value to stack"
     },
 	
+	"R@":{
+    execute: () => {
+        if (state.stack.length < 1) throw new Error("Stack underflow");
+        state.register = state.stack[state.stack.length - 1]; // スタックのトップをコピー
+        log(`R@: レジスタに ${state.register} をコピー`);
+    },
+    stackEffect: "( a -- a )",
+    description: "スタックトップの値をレジスタにコピー"
+    },
+	
+	"R+": {
+    execute: () => {
+        if (state.stack.length < 1) throw new Error("Stack underflow");
+        if (state.register === null) throw new Error("Register is empty");
+        state.register = state.register.add(state.stack.pop());
+        log(`R+: レジスタの値が ${state.register} になった`);
+    },
+    stackEffect: "( a -- )",
+    description: "レジスタにスタックトップの値を加算"
+    },
+	
+	"R-": {
+    execute: () => {
+        if (state.stack.length < 1) throw new Error("Stack underflow");
+        if (state.register === null) throw new Error("Register is empty");
+        state.register = state.register.subtract(state.stack.pop());
+        log(`R-: レジスタの値が ${state.register} になった`);
+    },
+    stackEffect: "( a -- )",
+    description: "レジスタからスタックトップの値を減算"
+    },
+	
+	"R*": {
+    execute: () => {
+        if (state.stack.length < 1) throw new Error("Stack underflow");
+        if (state.register === null) throw new Error("Register is empty");
+        state.register = state.register.multiply(state.stack.pop());
+        log(`R*: レジスタの値が ${state.register} になった`);
+    },
+    stackEffect: "( a -- )",
+    description: "レジスタにスタックトップの値を乗算"
+    },
+	
+	"R/": {
+    execute: () => {
+        if (state.stack.length < 1) throw new Error("Stack underflow");
+        if (state.register === null) throw new Error("Register is empty");
+        state.register = state.register.divide(state.stack.pop());
+        log(`R/: レジスタの値が ${state.register} になった`);
+    },
+    stackEffect: "( a -- )",
+    description: "レジスタをスタックトップの値で除算"
+    },
+
+
+	
 	"RESET": {
         execute: () => {
         log(`RESET: レジスタを空にする`);
