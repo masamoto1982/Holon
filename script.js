@@ -1,11 +1,9 @@
-// script.js - Holon language implementation
+// script.js - Pure Lambda-based Holon language with simplified syntax
 
-// データ構造
+// データ構造 - スタックとレジスタを削除
 const state = {
-    stack: [],
-    register: null,
+    dictionary: {}, // ワード辞書（ラムダ式をマップに格納）
     output: "",
-    customWords: {},
     logs: []
 };
 
@@ -92,7 +90,7 @@ class Fraction {
     }
 }
 
-// 文字列クラス（Holonでの文字列表現）
+// 文字列クラス
 class HolonString {
     constructor(value) {
         this.value = value;
@@ -103,398 +101,278 @@ class HolonString {
     }
 }
 
-// 組み込みワード定義
-const builtinWords = {
-    // スタック操作
-    "DUP": {
-        execute: () => {
-            if (state.stack.length < 1) throw new Error("Stack underflow");
-            const top = state.stack[state.stack.length - 1];
-            state.stack.push(top);
-            log(`DUP: ${top} -> Stack: ${state.stack.map(i => i.toString()).join(' ')}`);
-        },
-        stackEffect: "( a -- a a )",
-        description: "Duplicates the top stack item"
-    },
-    "DROP": {
-        execute: () => {
-            if (state.stack.length < 1) throw new Error("Stack underflow");
-            const dropped = state.stack.pop();
-            log(`DROP: ${dropped} -> Stack: ${state.stack.map(i => i.toString()).join(' ')}`);
-        },
-        stackEffect: "( a -- )",
-        description: "Removes the top stack item"
-    },
-    "SWAP": {
-        execute: () => {
-            if (state.stack.length < 2) throw new Error("Stack underflow");
-            const a = state.stack.pop();
-            const b = state.stack.pop();
-            state.stack.push(a, b);
-            log(`SWAP: ${a} ${b} -> Stack: ${state.stack.map(i => i.toString()).join(' ')}`);
-        },
-        stackEffect: "( a b -- b a )",
-        description: "Swaps the top two stack items"
-    },
-    "ROT": {
-        execute: () => {
-            if (state.stack.length < 3) throw new Error("Stack underflow");
-            const [c, b, a] = [state.stack.pop(), state.stack.pop(), state.stack.pop()];
-            state.stack.push(b, c, a);
-            log(`ROT: ${a} ${b} ${c} -> Stack: ${state.stack.map(i => i.toString()).join(' ')}`);
-        },
-        stackEffect: "( a b c -- b c a )",
-        description: "Rotates the top three stack items"
-    },
-    "CLEAR": {
-        execute: () => {
-            log(`CLEAR: Stack cleared from [${state.stack.map(i => i.toString()).join(' ')}]`);
-            state.stack = [];
-        },
-        stackEffect: "( ... -- )",
-        description: "Clears the entire stack"
+// ラムダ式クラス
+class Lambda {
+    constructor(params, body, meta = {}) {
+        this.params = params;     // パラメータ名の配列
+        this.body = body;         // 関数本体（トークン配列または関数）
+        this.meta = meta;         // メタデータ（説明など）
+    }
+    
+    toString() {
+        if (typeof this.body === 'function') {
+            return `λ[${this.params.join(' ')}] ( [native code] )`;
+        }
+        return `λ[${this.params.join(' ')}] ( ${this.body.length} tokens )`;
+    }
+    
+    // ラムダ式の適用
+    apply(args) {
+        log(`Applying lambda with args: [${args.map(a => a?.toString() || 'null').join(', ')}]`);
+        
+        // 環境の準備 - 引数とパラメータのマッピング
+        const env = {};
+        for (let i = 0; i < this.params.length; i++) {
+            env[this.params[i]] = i < args.length ? args[i] : null;
+        }
+        
+        // 関数本体が JavaScript 関数の場合
+        if (typeof this.body === 'function') {
+            return this.body(env);
+        }
+        
+        // 関数本体がトークン配列の場合
+        return evaluate(this.body, env);
+    }
+}
+
+// リストクラス
+class HolonList {
+    constructor(items = []) {
+        this.items = items;
+    }
+    
+    toString() {
+        return `[${this.items.map(item => item.toString()).join(' ')}]`;
+    }
+    
+    // リスト操作メソッド
+    first() {
+        return this.items.length > 0 ? this.items[0] : null;
+    }
+    
+    rest() {
+        return new HolonList(this.items.slice(1));
+    }
+    
+    append(item) {
+        return new HolonList([...this.items, item]);
+    }
+    
+    length() {
+        return new Fraction(this.items.length, 1);
+    }
+}
+
+// 辞書操作ユーティリティ
+const dictionaryOps = {
+    // 辞書にワードを定義
+    define: (name, value) => {
+        const normalizedName = normalizeToken(name);
+        state.dictionary[normalizedName] = value;
+        log(`Defined word "${normalizedName}" in dictionary`);
+        return value;
     },
     
-    // レジスタ操作
-    ">R": {
-        execute: () => {
-            if (state.stack.length < 1) throw new Error("Stack underflow");
-            state.register = state.stack.pop();
-            log(`>R: Register set to ${state.register}`);
-        },
-        stackEffect: "( a -- )",
-        description: "Stores top stack item to register"
-    },
-    "R>": {
-        execute: () => {
-            if (state.register === null) throw new Error("Register is empty");
-            state.stack.push(state.register);
-            log(`R>: Register ${state.register} pushed to stack`);
-        },
-        stackEffect: "( -- a )",
-        description: "Loads register value to stack"
-    },
-	
-	"R@":{
-    execute: () => {
-        if (state.stack.length < 1) throw new Error("Stack underflow");
-        state.register = state.stack[state.stack.length - 1]; // スタックのトップをコピー
-        log(`R@: レジスタに ${state.register} をコピー`);
-    },
-    stackEffect: "( a -- a )",
-    description: "スタックトップの値をレジスタにコピー"
-    },
-	
-	"R+": {
-    execute: () => {
-        if (state.stack.length < 1) throw new Error("Stack underflow");
-        if (state.register === null) throw new Error("Register is empty");
-        state.register = state.register.add(state.stack.pop());
-        log(`R+: レジスタの値が ${state.register} になった`);
-    },
-    stackEffect: "( a -- )",
-    description: "レジスタにスタックトップの値を加算"
-    },
-	
-	"R-": {
-    execute: () => {
-        if (state.stack.length < 1) throw new Error("Stack underflow");
-        if (state.register === null) throw new Error("Register is empty");
-        state.register = state.register.subtract(state.stack.pop());
-        log(`R-: レジスタの値が ${state.register} になった`);
-    },
-    stackEffect: "( a -- )",
-    description: "レジスタからスタックトップの値を減算"
-    },
-	
-	"R*": {
-    execute: () => {
-        if (state.stack.length < 1) throw new Error("Stack underflow");
-        if (state.register === null) throw new Error("Register is empty");
-        state.register = state.register.multiply(state.stack.pop());
-        log(`R*: レジスタの値が ${state.register} になった`);
-    },
-    stackEffect: "( a -- )",
-    description: "レジスタにスタックトップの値を乗算"
-    },
-	
-	"R/": {
-    execute: () => {
-        if (state.stack.length < 1) throw new Error("Stack underflow");
-        if (state.register === null) throw new Error("Register is empty");
-        state.register = state.register.divide(state.stack.pop());
-        log(`R/: レジスタの値が ${state.register} になった`);
-    },
-    stackEffect: "( a -- )",
-    description: "レジスタをスタックトップの値で除算"
-    },
-
-
-	
-	"RESET": {
-        execute: () => {
-        log(`RESET: レジスタを空にする`);
-        state.register = null;
-        },
-    stackEffect: "( -- )",
-    description: "レジスタを初期化（null に設定）"
-    },
-	
-	"FOLK": {
-        execute: () => {
-        if (state.register === null) {
-            log("FOLK: レジスタが無のためカスタムワード全体をスキップ");
-            throw new Error("SKIP_WORD"); // 特殊なエラーを投げてスキップを指示
+    // 辞書からワードを取得
+    lookup: (name) => {
+        const normalizedName = normalizeToken(name);
+        const value = state.dictionary[normalizedName];
+        if (value === undefined) {
+            log(`Word "${normalizedName}" not found in dictionary`);
+            return null;
         }
-        log("FOLK: レジスタが有のため処理を継続");
-        },
-    stackEffect: "( -- )",
-    description: "レジスタが無でなければ、カスタムワードの処理を実行する"
-    },
-	
-	"LOOP": {
-        execute: () => {
-        if (state.register === null) {
-            log("LOOP: レジスタが無のためループを終了");
-            return;
-        }
-
-        log("LOOP: レジスタが有のためループを開始");
-
-        // 現在実行中のカスタムワードを取得
-        const currentWord = Object.entries(state.customWords).find(([name, word]) => {
-            return word.body.includes("LOOP");
-        });
-
-        if (!currentWord) {
-            throw new Error("LOOP: 現在のカスタムワードが見つかりません");
-        }
-
-        const [wordName, wordData] = currentWord;
-        log(`LOOP: ${wordName} を繰り返し実行`);
-
-        // レジスタが `0` になったら `null` に変換
-        while (state.register !== null && !(state.register instanceof Fraction && state.register.numerator === 0)) {
-            interpret(wordData.body);
-        }
-
-        // ループ終了後、レジスタを `null` にする
-        if (state.register instanceof Fraction && state.register.numerator === 0) {
-            log("LOOP: レジスタが 0 のため、レジスタをクリア");
-            state.register = null;
-        }
-        },
-    stackEffect: "( -- )",
-    description: "レジスタが `null` でなく、0 でない間カスタムワードの処理を繰り返す"
+        log(`Found word "${normalizedName}" in dictionary`);
+        return value;
     },
     
-    // 数値操作
-    "+": {
-        execute: () => {
-            if (state.stack.length < 2) throw new Error("Stack underflow");
-            const b = state.stack.pop();
-            const a = state.stack.pop();
-            const result = a.add(b);
-            state.stack.push(result);
-            log(`+: ${a} + ${b} = ${result}`);
-        },
-        stackEffect: "( a b -- a+b )",
-        description: "Adds two numbers"
-    },
-    "-": {
-        execute: () => {
-            if (state.stack.length < 2) throw new Error("Stack underflow");
-            const b = state.stack.pop();
-            const a = state.stack.pop();
-            const result = a.subtract(b);
-            state.stack.push(result);
-            log(`-: ${a} - ${b} = ${result}`);
-        },
-        stackEffect: "( a b -- a-b )",
-        description: "Subtracts two numbers"
-    },
-    "*": {
-        execute: () => {
-            if (state.stack.length < 2) throw new Error("Stack underflow");
-            const b = state.stack.pop();
-            const a = state.stack.pop();
-            const result = a.multiply(b);
-            state.stack.push(result);
-            log(`*: ${a} * ${b} = ${result}`);
-        },
-        stackEffect: "( a b -- a*b )",
-        description: "Multiplies two numbers"
-    },
-    "/": {
-        execute: () => {
-            if (state.stack.length < 2) throw new Error("Stack underflow");
-            const b = state.stack.pop();
-            const a = state.stack.pop();
-            const result = a.divide(b);
-            state.stack.push(result);
-            log(`/: ${a} / ${b} = ${result}`);
-        },
-        stackEffect: "( a b -- a/b )",
-        description: "Divides two numbers"
+    // 辞書からワードを削除
+    remove: (name) => {
+        const normalizedName = normalizeToken(name);
+        if (state.dictionary[normalizedName] !== undefined) {
+            delete state.dictionary[normalizedName];
+            log(`Removed word "${normalizedName}" from dictionary`);
+            return true;
+        }
+        log(`Word "${normalizedName}" not found for removal`);
+        return false;
     },
     
-    // ワード定義
-    "DEF": {
-        execute: () => {
-            // この実装は実際の実行時には使用されない
-            // パーサーが特別に処理する
-            log("DEF: Word definition (handled by parser)");
-        },
-        stackEffect: "( -- )",
-        description: "Defines a new word"
-    },
-    "DEL": {
-        execute: () => {
-            // この実装は実際の実行時には使用されない
-            // パーサーが特別に処理する
-            log("DEL: Word deletion (handled by parser)");
-        },
-        stackEffect: "( -- )",
-        description: "Deletes a custom word"
-    },
+    // 辞書の全ワードのリスト取得
+    listWords: () => {
+        return Object.keys(state.dictionary);
+    }
+};
+
+// 組み込みのネイティブラムダ式を定義
+const initializeBuiltins = () => {
+    // 算術演算
+    dictionaryOps.define("ADD", new Lambda(["a", "b"], (env) => {
+        return env.a.add(env.b);
+    }, { description: "Adds two numbers", isBuiltin: true }));
+    
+    dictionaryOps.define("SUB", new Lambda(["a", "b"], (env) => {
+        return env.a.subtract(env.b);
+    }, { description: "Subtracts second number from first", isBuiltin: true }));
+    
+    dictionaryOps.define("MUL", new Lambda(["a", "b"], (env) => {
+        return env.a.multiply(env.b);
+    }, { description: "Multiplies two numbers", isBuiltin: true }));
+    
+    dictionaryOps.define("DIV", new Lambda(["a", "b"], (env) => {
+        return env.a.divide(env.b);
+    }, { description: "Divides first number by second", isBuiltin: true }));
     
     // 比較演算
-    "=": {
-        execute: () => {
-            if (state.stack.length < 2) throw new Error("Stack underflow");
-            const b = state.stack.pop();
-            const a = state.stack.pop();
-            const result = new Fraction(a.equals(b) ? 1 : 0, 1);
-            state.stack.push(result);
-            log(`=: ${a} = ${b} ? ${result}`);
-        },
-        stackEffect: "( a b -- flag )",
-        description: "Tests if a equals b"
-    },
-    "<": {
-        execute: () => {
-            if (state.stack.length < 2) throw new Error("Stack underflow");
-            const b = state.stack.pop();
-            const a = state.stack.pop();
-            const result = new Fraction(a.lessThan(b) ? 1 : 0, 1);
-            state.stack.push(result);
-            log(`<: ${a} < ${b} ? ${result}`);
-        },
-        stackEffect: "( a b -- flag )",
-        description: "Tests if a is less than b"
-    },
-    ">": {
-        execute: () => {
-            if (state.stack.length < 2) throw new Error("Stack underflow");
-            const b = state.stack.pop();
-            const a = state.stack.pop();
-            const result = new Fraction(a.greaterThan(b) ? 1 : 0, 1);
-            state.stack.push(result);
-            log(`>: ${a} > ${b} ? ${result}`);
-        },
-        stackEffect: "( a b -- flag )",
-        description: "Tests if a is greater than b"
-    },
-    ">=": {
-        execute: () => {
-            if (state.stack.length < 2) throw new Error("Stack underflow");
-            const b = state.stack.pop();
-            const a = state.stack.pop();
-            const result = new Fraction(a.greaterThan(b) || a.equals(b) ? 1 : 0, 1);
-            state.stack.push(result);
-            log(`>=: ${a} >= ${b} ? ${result}`);
-        },
-        stackEffect: "( a b -- flag )",
-        description: "Tests if a is greater than or equal to b"
-    },
-    "<=": {
-        execute: () => {
-            if (state.stack.length < 2) throw new Error("Stack underflow");
-            const b = state.stack.pop();
-            const a = state.stack.pop();
-            const result = new Fraction(a.lessThan(b) || a.equals(b) ? 1 : 0, 1);
-            state.stack.push(result);
-            log(`<=: ${a} <= ${b} ? ${result}`);
-        },
-        stackEffect: "( a b -- flag )",
-        description: "Tests if a is less than or equal to b"
-    },
+    dictionaryOps.define("EQ", new Lambda(["a", "b"], (env) => {
+        return new Fraction(env.a.equals(env.b) ? 1 : 0, 1);
+    }, { description: "Tests if values are equal", isBuiltin: true }));
     
-    // 特殊文字
-    "{": {
-        execute: () => {
-            // 実行時には処理されない
-            // パーサーが特別に処理する
-            log("{: Block start (handled by parser)");
-        },
-        stackEffect: "( -- )",
-        description: "Start of a word definition block"
-    },
-    "}": {
-        execute: () => {
-            // 実行時には処理されない
-            // パーサーが特別に処理する
-            log("}: Block end (handled by parser)");
-        },
-        stackEffect: "( -- )",
-        description: "End of a word definition block"
-    },
-    " ": {
-        execute: () => {
-            // 空白文字は実行時には何もしない
-            log(" : Space (token separator)");
-        },
-        stackEffect: "( -- )",
-        description: "Token separator"
-    }
+    dictionaryOps.define("LT", new Lambda(["a", "b"], (env) => {
+        return new Fraction(env.a.lessThan(env.b) ? 1 : 0, 1);
+    }, { description: "Tests if first value is less than second", isBuiltin: true }));
+    
+    dictionaryOps.define("GT", new Lambda(["a", "b"], (env) => {
+        return new Fraction(env.a.greaterThan(env.b) ? 1 : 0, 1);
+    }, { description: "Tests if first value is greater than second", isBuiltin: true }));
+    
+    // 論理演算
+    dictionaryOps.define("AND", new Lambda(["a", "b"], (env) => {
+        const aValue = env.a instanceof Fraction ? env.a.numerator !== 0 : !!env.a;
+        const bValue = env.b instanceof Fraction ? env.b.numerator !== 0 : !!env.b;
+        return new Fraction(aValue && bValue ? 1 : 0, 1);
+    }, { description: "Logical AND", isBuiltin: true }));
+    
+    dictionaryOps.define("OR", new Lambda(["a", "b"], (env) => {
+        const aValue = env.a instanceof Fraction ? env.a.numerator !== 0 : !!env.a;
+        const bValue = env.b instanceof Fraction ? env.b.numerator !== 0 : !!env.b;
+        return new Fraction(aValue || bValue ? 1 : 0, 1);
+    }, { description: "Logical OR", isBuiltin: true }));
+    
+    dictionaryOps.define("NOT", new Lambda(["a"], (env) => {
+        const aValue = env.a instanceof Fraction ? env.a.numerator !== 0 : !!env.a;
+        return new Fraction(aValue ? 0 : 1, 1);
+    }, { description: "Logical NOT", isBuiltin: true }));
+    
+    // 条件分岐
+    dictionaryOps.define("IF", new Lambda(["condition", "thenExpr", "elseExpr"], (env) => {
+        const condValue = env.condition instanceof Fraction ? 
+                           env.condition.numerator !== 0 : !!env.condition;
+        
+        if (condValue) {
+            log("IF: Condition is true, executing then branch");
+            return env.thenExpr instanceof Lambda ? 
+                   env.thenExpr.apply([]) : env.thenExpr;
+        } else {
+            log("IF: Condition is false, executing else branch");
+            return env.elseExpr instanceof Lambda ? 
+                   env.elseExpr.apply([]) : env.elseExpr;
+        }
+    }, { description: "Conditional execution", isBuiltin: true }));
+    
+    // 辞書操作 - ここでDEFをネイティブ関数として実装
+    dictionaryOps.define("DEF", new Lambda(["wordName", "params", "body"], (env) => {
+        // DEF ADDER [ x y ] ( ADD x y ) 形式の処理
+        if (typeof env.wordName !== 'string' && !(env.wordName instanceof HolonString)) {
+            throw new Error("First argument must be a word name");
+        }
+        
+        const name = env.wordName instanceof HolonString ? env.wordName.value : env.wordName;
+        
+        if (!(env.params instanceof HolonList)) {
+            throw new Error("Second argument must be a parameter list");
+        }
+        
+        // パラメータ名のリストを文字列配列に変換
+        const paramNames = env.params.items.map(item => {
+            if (typeof item === 'string') return item;
+            if (item instanceof HolonString) return item.value;
+            throw new Error("Parameters must be strings");
+        });
+        
+        // ラムダ式を作成して辞書に登録
+        const lambda = new Lambda(
+            paramNames,
+            env.body, // 本体は評価済みのボディか、未評価のトークン配列
+            { description: `Custom word: ${name}`, isCustom: true }
+        );
+        
+        dictionaryOps.define(name, lambda);
+        return lambda;
+    }, { description: "Defines a new word", isBuiltin: true }));
+    
+    dictionaryOps.define("UNDEF", new Lambda(["name"], (env) => {
+        if (typeof env.name !== 'string' && !(env.name instanceof HolonString)) {
+            throw new Error("Argument must be a name");
+        }
+        
+        const wordName = env.name instanceof HolonString ? env.name.value : env.name;
+        return dictionaryOps.remove(wordName);
+    }, { description: "Removes a word from the dictionary", isBuiltin: true }));
+    
+    dictionaryOps.define("WORDS", new Lambda([], (env) => {
+        const words = dictionaryOps.listWords();
+        return new HolonString(words.join(" "));
+    }, { description: "Lists all words in the dictionary", isBuiltin: true }));
+    
+    // 関数適用
+    dictionaryOps.define("APPLY", new Lambda(["func", "args"], (env) => {
+        if (!(env.func instanceof Lambda)) {
+            throw new Error("First argument must be a lambda expression");
+        }
+        
+        let args = [];
+        if (env.args instanceof HolonList) {
+            args = env.args.items;
+        } else if (Array.isArray(env.args)) {
+            args = env.args;
+        } else {
+            args = [env.args];
+        }
+        
+        return env.func.apply(args);
+    }, { description: "Applies a function to arguments", isBuiltin: true }));
+    
+    // 入出力
+    dictionaryOps.define("PRINT", new Lambda(["value"], (env) => {
+        let output;
+        if (env.value instanceof HolonString) {
+            output = env.value.value;
+        } else {
+            output = env.value ? env.value.toString() : "null";
+        }
+        
+        state.output += output;
+        log(`PRINT: ${output}`);
+        return env.value;
+    }, { description: "Prints a value", isBuiltin: true }));
+    
+    dictionaryOps.define("PRINTLN", new Lambda(["value"], (env) => {
+        let output;
+        if (env.value instanceof HolonString) {
+            output = env.value.value;
+        } else {
+            output = env.value ? env.value.toString() : "null";
+        }
+        
+        state.output += output + "\n";
+        log(`PRINTLN: ${output}`);
+        return env.value;
+    }, { description: "Prints a value followed by a newline", isBuiltin: true }));
+    
+    dictionaryOps.define("CLEAR", new Lambda([], (env) => {
+        state.output = "";
+        log("CLEAR: Output cleared");
+        return null;
+    }, { description: "Clears the output", isBuiltin: true }));
 };
 
 // UI要素の取得
 const elements = {
-    output: document.getElementById("output"),
-    stack: document.getElementById("stack"),
-    register: document.getElementById("register"),
-    input: document.getElementById("input"),
-    builtinWordsContainer: document.getElementById("builtin-words"),
-    customWordsContainer: document.getElementById("custom-words")
-};
-
-// 依存関係を分析する関数
-const analyzeDependencies = () => {
-    const referencedBy = {}; // wordA: [wordB, wordC] - wordAはwordBとwordCから参照されている
-    const references = {};   // wordA: [wordB, wordC] - wordAはwordBとwordCを参照している
-    
-    // 初期化
-    Object.keys(state.customWords).forEach(word => {
-        referencedBy[word] = [];
-        references[word] = [];
-    });
-    
-    // 依存関係を解析
-    Object.keys(state.customWords).forEach(wordName => {
-        const body = state.customWords[wordName].body;
-        body.forEach(token => {
-            const normalizedToken = normalizeToken(token);
-            if (state.customWords[normalizedToken]) {
-                // 依存関係を記録
-                if (!references[wordName].includes(normalizedToken)) {
-                    references[wordName].push(normalizedToken);
-                }
-                if (!referencedBy[normalizedToken].includes(wordName)) {
-                    referencedBy[normalizedToken].push(wordName);
-                }
-            }
-        });
-    });
-    
-    return { referencedBy, references };
-};
-
-// カスタムワードが他のワードから参照されているかチェックする関数
-const isWordReferencedByOthers = wordName => {
-    const normalizedWordName = normalizeToken(wordName);
-    const { referencedBy } = analyzeDependencies();
-    return referencedBy[normalizedWordName]?.length > 0;
+    output: document.querySelector('.output-box p'),
+    input: document.querySelector('textarea'),
+    builtinWords: document.querySelector('.builtin-words-area'),
+    customWords: document.querySelector('.custom-words-area')
 };
 
 // UI更新関数
@@ -502,30 +380,32 @@ const updateUI = () => {
     // 出力エリア更新
     elements.output.textContent = state.output;
     
-    // スタック更新（横並びで表示）
-    elements.stack.textContent = state.stack.map(item => item.toString()).join(" ");
-    
-    // レジスタ更新
-    elements.register.textContent = state.register ? state.register.toString() : "";
-    
-    // カスタムワードエリア更新
-    renderCustomWords();
+    // 辞書ワード表示更新
+    renderDictionary();
 };
 
-// 組み込みワードボタンの生成
-// 組み込みワードボタンの生成
-const initBuiltinWords = () => {
-    elements.builtinWordsContainer.innerHTML = "";
+// 辞書ワードボタンの生成
+const renderDictionary = () => {
+    // 組み込みワード表示
+    elements.builtinWords.innerHTML = '<h3>Built-In Words</h3>';
     
-    Object.entries(builtinWords).forEach(([word, wordInfo]) => {
-        const wordButton = document.createElement("button");
-        // 組み込みワードは末尾に鍵マークを追加
-        wordButton.textContent = word + " 🔒";
-        wordButton.className = "word-button";
-        wordButton.title = `${wordInfo.stackEffect} ${wordInfo.description}`;
+    // 組み込みワードを取得
+    const builtinWords = Object.entries(state.dictionary)
+        .filter(([_, value]) => value.meta && value.meta.isBuiltin)
+        .map(([name]) => name)
+        .sort();
+    
+    builtinWords.forEach(word => {
+        const wordInfo = state.dictionary[word];
+        const meta = wordInfo.meta || {};
         
+        const wordButton = document.createElement("button");
+        wordButton.textContent = word;
+        wordButton.title = meta.description || "";
+        wordButton.className = "word-button";
+        
+        // クリックイベント - 空白を追加しない
         wordButton.addEventListener("click", () => {
-            // クリック時は鍵マークなしのワードを挿入
             const cursorPos = elements.input.selectionStart;
             const textBefore = elements.input.value.substring(0, cursorPos);
             const textAfter = elements.input.value.substring(cursorPos);
@@ -536,40 +416,38 @@ const initBuiltinWords = () => {
             elements.input.focus();
         });
         
-        elements.builtinWordsContainer.appendChild(wordButton);
+        elements.builtinWords.appendChild(wordButton);
     });
-};
-
-// カスタムワードボタンの生成
-const renderCustomWords = () => {
-    elements.customWordsContainer.innerHTML = "";
     
-    // 依存関係を分析
-    const { referencedBy } = analyzeDependencies();
+    // カスタムワード表示
+    elements.customWords.innerHTML = '<h3>Custom Words</h3>';
     
-    Object.entries(state.customWords).forEach(([word, wordInfo]) => {
+    // カスタムワードを取得
+    const customWords = Object.entries(state.dictionary)
+        .filter(([_, value]) => value.meta && value.meta.isCustom)
+        .map(([name]) => name)
+        .sort();
+    
+    customWords.forEach(word => {
+        const wordInfo = state.dictionary[word];
+        const meta = wordInfo.meta || {};
+        
         const wordButton = document.createElement("button");
+        wordButton.textContent = word;
         
-        // 他のワードから参照されているかチェック
-        const isReferenced = referencedBy[word]?.length > 0;
-        
-        // 参照されているワードには末尾に鍵マークを追加
-        wordButton.textContent = isReferenced ? word + " 🔒" : word;
-        wordButton.className = "word-button";
-        wordButton.dataset.word = word; // データ属性にワード名を保存
-        
-        // ツールチップ情報
-        let tooltip = wordInfo.stackEffect || "";
-        if (isReferenced) {
-            tooltip += `\nReferenced by: ${referencedBy[word].join(", ")}`;
-            tooltip += "\n(Cannot be deleted or modified)";
+        // ホバー表示をコメントまたは本体に変更
+        if (meta.comment) {
+            wordButton.title = meta.comment;
+        } else {
+            const params = wordInfo.params.join(' ');
+            const bodyPreview = wordInfo.body.slice(0, 10).join(' ') + (wordInfo.body.length > 10 ? "..." : "");
+            wordButton.title = `[${params}] (${bodyPreview})`;
         }
         
-        wordButton.title = tooltip;
+        wordButton.className = "word-button";
         
-        // クリックイベント
+        // クリックイベント - 空白を追加しない
         wordButton.addEventListener("click", () => {
-            // クリック時は鍵マークなしのワードを挿入
             const cursorPos = elements.input.selectionStart;
             const textBefore = elements.input.value.substring(0, cursorPos);
             const textAfter = elements.input.value.substring(cursorPos);
@@ -580,11 +458,11 @@ const renderCustomWords = () => {
             elements.input.focus();
         });
         
-        elements.customWordsContainer.appendChild(wordButton);
+        elements.customWords.appendChild(wordButton);
     });
 };
 
-// トークン分割（文字列リテラルを考慮）
+// トークン分割（文字列リテラル、コメントを考慮）
 const tokenize = code => {
     log(`Tokenizing: "${code}"`);
     
@@ -592,12 +470,38 @@ const tokenize = code => {
     let i = 0;
     let currentToken = '';
     let inString = false;
+    let inComment = false;
     
     while (i < code.length) {
         const char = code[i];
         
-        // 文字列リテラルの処理
-        if (char === '"') {
+        // コメント処理
+        if (char === '#' && !inString) {
+            // 行の終わりまでスキップ
+            inComment = true;
+            
+            // 現在のトークンがあれば追加
+            if (currentToken.length > 0) {
+                tokens.push(currentToken);
+                currentToken = '';
+            }
+            
+            // コメント自体をトークンとして収集
+            currentToken = '#';
+        } else if (inComment) {
+            // コメント内の文字を収集
+            if (char === '\n') {
+                // 改行でコメント終了
+                if (currentToken.length > 0) {
+                    tokens.push(currentToken);
+                    currentToken = '';
+                }
+                inComment = false;
+            } else {
+                currentToken += char;
+            }
+        } else if (char === '"') {
+            // 文字列リテラルの処理
             if (inString) {
                 // 文字列の終了
                 currentToken += char;
@@ -622,6 +526,13 @@ const tokenize = code => {
                 tokens.push(currentToken);
                 currentToken = '';
             }
+        } else if ("[]()".includes(char)) {
+            // 特殊文字（括弧）は独立したトークンとして扱う
+            if (currentToken.length > 0) {
+                tokens.push(currentToken);
+                currentToken = '';
+            }
+            tokens.push(char);
         } else {
             // その他の文字
             currentToken += char;
@@ -639,164 +550,17 @@ const tokenize = code => {
     return tokens;
 };
 
-// パーサー
-// パーサー関数の修正部分
-const parse = tokens => {
-    log(`Parsing ${tokens.length} tokens`);
-    const program = [];
-    let i = 0;
-    
-    while (i < tokens.length) {
-        const token = tokens[i];
-        log(`Parsing token ${i}: "${token}"`);
-        
-        // ワード定義の処理
-        if (normalizeToken(token) === "{") {
-            // ワード名は前のトークン
-            if (i <= 0) {
-                log(`Error: No word name before block start`);
-                throw new Error("No word name before block start");
-            }
-            
-            const wordName = tokens[i - 1];
-            log(`Found word definition start for "${wordName}"`);
-            
-            // ここで前のトークン（ワード名）をプログラムから削除
-            // これがないと定義対象のワードもプログラムに含まれ実行されてしまう
-            if (program.length > 0 && program[program.length - 1] === wordName) {
-                program.pop();
-            }
-            
-            const bodyStart = i + 1;
-            let depth = 1;
-            let j = bodyStart;
-            
-            // 対応する閉じカッコを探す
-            while (j < tokens.length && depth > 0) {
-                if (normalizeToken(tokens[j]) === "{") depth++;
-                if (normalizeToken(tokens[j]) === "}") depth--;
-                j++;
-            }
-            
-            if (depth !== 0) {
-                log(`Error: Unclosed block for "${wordName}"`);
-                throw new Error("Unclosed block");
-            }
-            
-            const bodyEnd = j - 1;
-            const bodyTokens = tokens.slice(bodyStart, bodyEnd);
-            log(`Word body: [${bodyTokens.join(', ')}]`);
-            
-            // スタック効果コメントの確認
-            let stackEffect = "";
-            let defIndex = -1;
-            
-            for (let k = j; k < tokens.length; k++) {
-                if (normalizeToken(tokens[k]) === "DEF" || normalizeToken(tokens[k]) === "DEL") {
-                    defIndex = k;
-                    log(`Found ${tokens[k]} at position ${k}`);
-                    break;
-                } else if (tokens[k] === "(" && k < tokens.length - 1) {
-                    // スタック効果コメントを探す
-                    let l = k + 1;
-                    let commentTokens = [];
-                    
-                    while (l < tokens.length && tokens[l] !== ")") {
-                        commentTokens.push(tokens[l]);
-                        l++;
-                    }
-                    
-                    if (l < tokens.length && tokens[l] === ")") {
-                        stackEffect = commentTokens.join(" ");
-                        log(`Found stack effect: "${stackEffect}"`);
-                        k = l;
-                    }
-                }
-            }
-            
-            if (defIndex !== -1) {
-                const normalizedWordName = normalizeToken(wordName);
-                const isDefine = normalizeToken(tokens[defIndex]) === "DEF";
-                
-                if (isDefine) {
-                    // ワード再定義時、他のワードから参照されているか確認
-                    if (state.customWords[normalizedWordName] && isWordReferencedByOthers(normalizedWordName)) {
-                        log(`Cannot redefine word "${normalizedWordName}": referenced by other words`);
-                        state.output += `Error: Cannot redefine "${normalizedWordName}" as it is referenced by other words\n`;
-                    } else {
-                        // カスタムワード定義
-                        state.customWords[normalizedWordName] = {
-                            body: bodyTokens,
-                            stackEffect
-                        };
-                        log(`Defined custom word "${normalizedWordName}" with body [${bodyTokens.join(', ')}] and stack effect "${stackEffect}"`);
-                    }
-                } else {
-                    // カスタムワード削除前に使用されているか確認
-                    if (isWordReferencedByOthers(normalizedWordName)) {
-                        log(`Cannot delete word "${normalizedWordName}": referenced by other words`);
-                        state.output += `Error: Cannot delete "${normalizedWordName}" as it is referenced by other words\n`;
-                    } else {
-                        // カスタムワード削除
-                        log(`Deleted custom word "${normalizedWordName}"`);
-                        delete state.customWords[normalizedWordName];
-                    }
-                }
-                
-                i = defIndex + 1;
-                continue;
-            }
-        }
-        
-        // DEL単体で使用された場合（短縮形）
-        if (normalizeToken(token) === "DEL" && i > 0) {
-            const wordName = normalizeToken(tokens[i - 1]);
-            if (state.customWords[wordName]) {
-                // 他のカスタムワードで使用されているかチェック
-                if (isWordReferencedByOthers(wordName)) {
-                    log(`Cannot delete word "${wordName}": used in other custom words`);
-                    state.output += `Error: Cannot delete "${wordName}" as it is used by other words\n`;
-                } else {
-                    log(`Deleted custom word "${wordName}" (short form)`);
-                    delete state.customWords[wordName];
-                }
-                i += 1;
-                continue;
-            }
-        }
-        
-        // 通常のトークン処理
-        if (token !== "(" && token !== ")") {
-            program.push(token);
-            log(`Added token to program: "${token}"`);
-        } else {
-            log(`Skipped token: "${token}" (comment delimiter)`);
-        }
-        
-        i++;
-    }
-    
-    log(`Parsed program: [${program.join(', ')}]`);
-    return program;
-};
-
-// 数値トークンまたは文字列リテラルの処理
-const parseToken = token => {
-    // 正規化したトークンで組み込みワードを検索
-    const normalizedToken = normalizeToken(token);
-    if (builtinWords[normalizedToken]) {
-        return null;
-    }
-    
+// 値の解析（数値、文字列など）
+const parseValue = token => {
     // 文字列リテラルの場合
-    if (token.startsWith('"') && token.endsWith('"')) {
+    if (typeof token === 'string' && token.startsWith('"') && token.endsWith('"')) {
         const stringValue = token.slice(1, -1);
         log(`Parsed string: ${token} -> "${stringValue}"`);
         return new HolonString(stringValue);
     }
     
     // 分数表記 (a/b) の場合
-    if (token.includes("/")) {
+    if (typeof token === 'string' && token.includes("/")) {
         const parts = token.split("/");
         if (parts.length !== 2) {
             log(`Invalid fraction format: ${token}`);
@@ -817,81 +581,308 @@ const parseToken = token => {
     }
     
     // 整数の場合
-    const number = parseInt(token, 10);
-    if (isNaN(number)) {
-        log(`Not a number or string: ${token}`);
-        return null; // 数値でも文字列でもない場合はnullを返す
+    if (typeof token === 'string') {
+        const number = parseInt(token, 10);
+        if (!isNaN(number)) {
+            const fraction = new Fraction(number, 1);
+            log(`Parsed integer: ${token} -> ${fraction.toString()}`);
+            return fraction;
+        }
     }
     
-    const fraction = new Fraction(number, 1);
-    log(`Parsed integer: ${token} -> ${fraction.toString()}`);
-    return fraction;
-};
-
-// インタプリタ
-const interpret = program => {
-    log(`Interpreting program with ${program.length} tokens`);
-
-    // `LOOP` を含むワードなら、最初にレジスタをチェック
-    if (program.includes("LOOP") && state.register === null) {
-        log("LOOP: レジスタが無のため、ワード全体をスキップ");
-        return; // ワード全体をスキップ
-    }
-
-    let i = 0;
-    try {
-        while (i < program.length) {
-            const token = program[i];
-            log(`Executing token ${i}: "${token}"`);
-
-            // 数値または文字列の場合はスタックにプッシュ
-            const parsedValue = parseToken(token);
-            if (parsedValue !== null) {
-                state.stack.push(parsedValue);
-                log(`Pushed value to stack: ${parsedValue.toString()}`);
-                i++;
-                continue;
-            }
-
-            // 組み込みワードの場合
-            const normalizedToken = normalizeToken(token);
-            if (builtinWords[normalizedToken]) {
-                log(`Executing builtin word: "${normalizedToken}"`);
-                builtinWords[normalizedToken].execute();
-                i++;
-                continue;
-            }
-
-            // カスタムワードの場合
-            if (state.customWords[normalizedToken]) {
-                log(`Executing custom word: "${normalizedToken}"`);
-                const customBody = state.customWords[normalizedToken].body;
-                log(`Custom word body: [${customBody.join(', ')}]`);
-                
-                // `LOOP` の場合はレジスタの状態をチェックしながら実行
-                if (customBody.includes("LOOP")) {
-                    while (state.register !== null) {
-                        interpret(customBody);
-                    }
-                } else {
-                    interpret(customBody);
-                }
-                i++;
-                continue;
-            }
-
-            // 未知のワード
-            log(`Unknown word: "${token}"`);
-            throw new Error(`Unknown word: ${token}`);
+    // 辞書ワードの場合
+    if (typeof token === 'string') {
+        const normalizedToken = normalizeToken(token);
+        const word = dictionaryOps.lookup(normalizedToken);
+        if (word) {
+            log(`Found word in dictionary: ${normalizedToken}`);
+            return word;
         }
-    } catch (e) {
-        log(`Error: ${e.message}`);
     }
-
-    log(`Program execution completed`);
+    
+    // 解析できない値はそのまま返す
+    return token;
 };
 
+// パラメータリストの解析
+const parseParamList = (tokens, startIndex) => {
+    // [ で始まるか確認
+    if (tokens[startIndex] !== '[') {
+        throw new Error("Expected '[' to start parameter list");
+    }
+    
+    const params = [];
+    let i = startIndex + 1;
+    
+    // ] までパラメータを収集
+    while (i < tokens.length && tokens[i] !== ']') {
+        params.push(tokens[i]);
+        i++;
+    }
+    
+    if (i >= tokens.length || tokens[i] !== ']') {
+        throw new Error("Unclosed parameter list");
+    }
+    
+    return {
+        params,
+        endIndex: i
+    };
+};
 
+// 関数本体の解析
+const parseFunctionBody = (tokens, startIndex) => {
+    // ( で始まるか確認
+    if (tokens[startIndex] !== '(') {
+        throw new Error("Expected '(' to start function body");
+    }
+    
+    const body = [];
+    let i = startIndex + 1;
+    let depth = 1;
+    
+    // 対応する ) までトークンを収集
+    while (i < tokens.length && depth > 0) {
+        if (tokens[i] === '(') depth++;
+        else if (tokens[i] === ')') depth--;
+        
+        if (depth > 0) {
+            body.push(tokens[i]);
+        }
+        i++;
+    }
+    
+    if (depth !== 0) {
+        throw new Error("Unclosed function body");
+    }
+    
+    return {
+        body,
+        endIndex: i - 1
+    };
+};
+
+// 新しい構文でのワード定義の解析
+const parseWordDefinition = (tokens, startIndex) => {
+    // DEF で始まるか確認
+    if (normalizeToken(tokens[startIndex]) !== 'DEF') {
+        return null;
+    }
+    
+    // ワード名
+    if (startIndex + 1 >= tokens.length) {
+        throw new Error("Expected word name after DEF");
+    }
+    const wordName = tokens[startIndex + 1];
+    
+    // パラメータリスト
+    if (startIndex + 2 >= tokens.length || tokens[startIndex + 2] !== '[') {
+        throw new Error("Expected parameter list after word name");
+    }
+    const { params, endIndex: paramsEndIndex } = parseParamList(tokens, startIndex + 2);
+    
+    // 関数本体
+    if (paramsEndIndex + 1 >= tokens.length || tokens[paramsEndIndex + 1] !== '(') {
+        throw new Error("Expected function body after parameter list");
+    }
+    const { body, endIndex: bodyEndIndex } = parseFunctionBody(tokens, paramsEndIndex + 1);
+    
+    // コメントを確認
+    let comment = "";
+    let endIndex = bodyEndIndex;
+    
+    // コメントを探す (#で始まる部分)
+    for (let i = bodyEndIndex + 1; i < tokens.length; i++) {
+        if (tokens[i].startsWith('#')) {
+            comment = tokens[i].substring(1); // #を除いたコメント本文
+            endIndex = i;
+            break;
+        }
+    }
+    
+    // ラムダ式を作成して辞書に登録
+    const lambda = new Lambda(
+        params,
+        body,
+        { 
+            description: comment || `Custom word: ${wordName}`, 
+            isCustom: true,
+            comment: comment 
+        }
+    );
+    
+    dictionaryOps.define(wordName, lambda);
+    
+    return {
+        wordName,
+        lambda,
+        endIndex: endIndex
+    };
+};
+
+// パーサー
+const parse = tokens => {
+    log(`Parsing ${tokens.length} tokens`);
+    const program = [];
+    let i = 0;
+    
+    while (i < tokens.length) {
+        const token = tokens[i];
+        log(`Parsing token ${i}: "${token}"`);
+        
+        // ワード定義の処理
+        if (normalizeToken(token) === 'DEF') {
+            const defResult = parseWordDefinition(tokens, i);
+            if (defResult) {
+                i = defResult.endIndex + 1;
+                continue;
+            }
+        }
+        
+        // リストリテラルの処理
+        if (token === '[') {
+            const items = [];
+            let j = i + 1;
+            
+            while (j < tokens.length && tokens[j] !== ']') {
+                const value = parseValue(tokens[j]);
+                items.push(value);
+                j++;
+            }
+            
+            if (j >= tokens.length) {
+                throw new Error("Unclosed list literal");
+            }
+            
+            program.push(new HolonList(items));
+            i = j + 1;
+            continue;
+        }
+        
+        // 括弧トークンはスキップ（ワード定義では別途処理済み）
+        if (token === '(' || token === ')' || token === ']') {
+            i++;
+            continue;
+        }
+        
+        // コメントはスキップ
+        if (token.startsWith('#')) {
+            i++;
+            continue;
+        }
+        
+        // 通常のトークン処理
+        const value = parseValue(token);
+        program.push(value);
+        i++;
+    }
+    
+    log(`Parsed program: ${program.length} elements`);
+    return program;
+};
+
+// 環境内の変数解決
+const resolveVariable = (name, env) => {
+    if (env && env[name] !== undefined) {
+        return env[name];
+    }
+    
+    // 辞書から探す
+    return dictionaryOps.lookup(name);
+};
+
+// 評価関数
+const evaluate = (program, env = {}) => {
+    log(`Evaluating program with ${program.length} elements`);
+    
+    let result = null;
+    let i = 0;
+    
+    while (i < program.length) {
+        const token = program[i];
+        log(`Evaluating element ${i}: ${token}`);
+        
+        try {
+            // 値（数値、文字列、リスト）の場合
+            if (token instanceof Fraction || token instanceof HolonString || 
+                token instanceof HolonList) {
+                result = token;
+                i++;
+                continue;
+            }
+            
+            // ラムダ式の場合（直接値として使われる場合）
+            // ラムダ式の場合（直接値として使われる場合）
+            if (token instanceof Lambda) {
+                result = token;
+                i++;
+                continue;
+            }
+            
+            // 変数参照または辞書ワードの場合
+            if (typeof token === 'string') {
+                // 環境内に変数があるか確認
+                const value = resolveVariable(token, env);
+                
+                if (value === null) {
+                    throw new Error(`Unknown word or variable: ${token}`);
+                }
+                
+                // ラムダ式の場合、適用が必要かチェック
+                if (value instanceof Lambda) {
+                    // ラムダ式の場合、必要な引数を集める
+                    const argsNeeded = value.params.length;
+                    const args = [];
+                    
+                    // 引数が足りない場合、エラー
+                    if (i + argsNeeded >= program.length) {
+                        throw new Error(`Not enough arguments for ${token}, expected ${argsNeeded}`);
+                    }
+                    
+                    // 残りのトークンから引数を収集して評価
+                    for (let j = 0; j < argsNeeded; j++) {
+                        // 次のトークンを評価
+                        const nextToken = program[i + j + 1];
+                        
+                        // 値として評価可能な場合
+                        if (nextToken instanceof Fraction || 
+                            nextToken instanceof HolonString || 
+                            nextToken instanceof HolonList ||
+                            nextToken instanceof Lambda) {
+                            args.push(nextToken);
+                        } else if (typeof nextToken === 'string') {
+                            // 変数または辞書ワードを解決
+                            const argValue = resolveVariable(nextToken, env);
+                            if (argValue === null) {
+                                throw new Error(`Unknown word or variable: ${nextToken}`);
+                            }
+                            args.push(argValue);
+                        } else {
+                            throw new Error(`Invalid argument: ${nextToken}`);
+                        }
+                    }
+                    
+                    // ラムダ式を適用
+                    result = value.apply(args);
+                    
+                    // 処理した引数の分だけインデックスを進める
+                    i += argsNeeded + 1;
+                } else {
+                    // 値の場合はそのまま
+                    result = value;
+                    i++;
+                }
+            } else {
+                throw new Error(`Invalid token: ${token}`);
+            }
+        } catch (error) {
+            log(`Error evaluating token: ${error.message}`);
+            throw error;
+        }
+    }
+    
+    return result;
+};
 
 // 実行関数
 const executeCode = code => {
@@ -901,99 +892,63 @@ const executeCode = code => {
         const tokens = tokenize(code);
         const program = parse(tokens);
         log(`Executing program`);
-        interpret(program);
-        log(`Final stack: [${state.stack.map(i => i.toString()).join(' ')}]`);
-        updateUI();
-        // 実行後に入力内容をクリア
-        elements.input.value = "";
-        log(`Input area cleared`);
-    } catch (error) {
-        log(`Error: ${error.message}`);
-        state.output += `Error: ${error.message}\n`;
-        // エラー時にはログも出力エリアに表示
-        state.output += `\n===== Debug Logs =====\n${state.logs.join('\n')}\n`;
-        updateUI();
-    }
-    log(`==== Execution completed ====`);
-};
-
-// 出力関数
-const outputStackTop = () => {
-    log(`==== Output started ====`);
-    try {
-        if (state.stack.length < 1) throw new Error("Stack underflow");
-        const top = state.stack.pop();
-        let output;
+        const result = evaluate(program);
+        log(`Result: ${result ? result.toString() : 'null'}`);
         
-        // 文字列オブジェクトの場合は引用符なしで出力
-        if (top instanceof HolonString) {
-            output = top.value;
-        } else {
-            output = top.toString();
+        // 結果を出力に追加（あれば）
+        if (result && state.output.length > 0 && !state.output.endsWith('\n')) {
+            state.output += '\n';
         }
         
-        state.output += output + "\n";
-        log(`Output: ${output}`);
         updateUI();
-        // 実行後に入力内容をクリア
+        
+        // 実行に成功した場合のみ入力内容をクリア
         elements.input.value = "";
-        log(`Input area cleared after output`);
+        log(`Input area cleared after successful execution`);
     } catch (error) {
         log(`Error: ${error.message}`);
         state.output += `Error: ${error.message}\n`;
         updateUI();
+        // エラーの場合は入力をクリアしない
     }
-    log(`==== Output completed ====`);
+    log(`==== Execution completed ====`);
 };
 
 // イベントリスナー
 const initEventListeners = () => {
     // キー入力イベントを監視
     elements.input.addEventListener("keydown", event => {
-        // Shift+Enterの処理（実行のみ）
-        if (event.key === "Enter" && event.shiftKey && !event.ctrlKey) {
+        // Shift+Enterの処理
+        if (event.key === "Enter" && event.shiftKey) {
             event.preventDefault(); // デフォルトの改行を防止
-            log(`Shift+Enter pressed. Execute only.`);
+            log(`Shift+Enter pressed. Executing code.`);
             
             const code = elements.input.value;
             state.logs = [];   // ログをクリア
             executeCode(code);
         }
-        
-        // Ctrl+Enterの処理（出力のみ）
-        else if (event.key === "Enter" && !event.shiftKey && event.ctrlKey) {
-            event.preventDefault(); // デフォルトの改行を防止
-            log(`Ctrl+Enter pressed. Output only.`);
-            
-            state.logs = [];   // ログをクリア
-            outputStackTop();
-        }
-        
-        // Shift+Ctrl+Enterの処理（実行して出力）
-        else if (event.key === "Enter" && event.shiftKey && event.ctrlKey) {
-            event.preventDefault(); // デフォルトの改行を防止
-            log(`Shift+Ctrl+Enter pressed. Execute and output.`);
-            
-            const code = elements.input.value;
-            state.logs = [];   // ログをクリア
-            executeCode(code);
-            outputStackTop();
-        }
-        
-        // 通常のEnterキーは改行として処理
-        // else if (event.key === "Enter") {
-        //    改行は標準動作に任せる
-        // }
     });
 };
 
 // 初期化
 const init = () => {
-    log(`Initializing Holon interpreter`);
-    initBuiltinWords();
+    log(`Initializing Pure Lambda-based Holon interpreter with simplified syntax`);
+    
+    // 組み込みワード（ラムダ式）の初期化
+    initializeBuiltins();
+    
+    // イベントリスナーの設定
     initEventListeners();
+    
+    // UI更新
     updateUI();
-    log(`Initialization completed`);
+    
+    // ウェルカムメッセージ
+    state.output = "Lambda-based Holon Interpreter\n" +
+                  "Type code and press Shift+Enter to execute\n" +
+                  "Example: DEF ADDER [ x y ] ( ADD x y )\n" +
+                  "         3 5 ADDER\n";
+    updateUI();
 };
 
 // アプリケーション起動

@@ -1,59 +1,53 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Holon</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Holon</title>
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
-    <header>
+  <header>
     <div class="header-container">
+      <a href="https://github.com/masamoto1982" target="_blank">
         <img src="image/logo.png" alt="Holon Logo" class="logo">
-        <h1>Holon<span>Ver.202503210111</span></h1>
+      </a>
+      <h1>Holon
+        <span>Ver.202503301129</span>
+      </h1>
     </div>
-</header>
-
-    <article>
-        <section class="top">
-            <div class="output-area">
-			<h2>Output</h2>
-                <pre id="output"></pre>
-            </div>
-            <div class="status-area">
-			<h2>Status</h2>
-                <div class="stack-area">
-                    <h3>Stack</h3>
-                    <pre id="stack"></pre>
-                </div>
-                <div class="register-area">
-                    <h3>Register</h3>
-                    <pre id="register"></pre>
-                </div>
-            </div>
-        </section>
-        <section class="bottom">
-            <div class="input-area">
-			<h2>Input</h2>
-				<textarea id="input" placeholder="Enter Holon command"></textarea>
-            </div>
-            <div class="dictionary-area">
-			<h2>Dictionary</h2>
-                <div class="builtin-words-area">
-                    <h3>Built-in Words</h3>
-                    <div id="builtin-words"></div>
-                </div>
-                <div class="custom-words-area">
-                    <h3>Custom Words</h3>
-                    <div id="custom-words"></div>
-                </div>
-            </div>
-        </section>
-    </article>
-    <footer>
-    <p>© 2025 <a href="https://github.com/masamoto1982" target="_blank">masamoto yamashiro</a></p>
-</footer>
-
-    <script src="script.js"></script>
+  </header>
+  <article class="container">
+    <section class="io-section">
+      <h2 title="XXX">I/O</h2>
+      <div class="output-area">
+        <h3 title="XXX">Output</h3>
+        <div class="output-box">
+          <!-- ここにアウトプットを表示する内容が入ります -->
+          <p></p>
+        </div>
+      </div>
+      <div class="input-area">
+        <h3 title="XXX">Input</h3>
+        <textarea placeholder="Shift & Enter key to execute"></textarea>
+      </div>
+    </section>
+    <section class="dictionary-section">
+      <h2 title="XXX">Dictionary</h2>
+      <div class="builtin-words-area">
+        <h3 title="XXX">Built-In Words</h3>
+      </div>
+      <div class="custom-words-area">
+        <h3 title="XXX">Custom Words</h3>
+      </div>
+    </section>
+  </article>
+  <footer>© 2025
+    <a href="https://github.com/masamoto1982" target="_blank">masamoto yamashiro</a>
+  </footer>
+  <script src="script.js"></script>
 </body>
+
 </html>
