@@ -64,7 +64,6 @@ span {
 .builtin-words-area,
 .custom-words-area {
   background: linear-gradient(45deg, var(--background-dark), var(--background-light));
-  display: flex;
   align-items: center;
   flex-wrap: wrap;
   /* nowrap を wrap に変更 */

@@ -946,7 +946,7 @@ const init = () => {
     // ウェルカムメッセージ
     state.output = "Lambda-based Holon Interpreter\n" +
                   "Type code and press Shift+Enter to execute\n" +
-                  "Example: DEF ADDER [ x y ] ( ADD x y )\n" +
+                  "Example: DEF ADDER [ x y ] ( ADD x y ) #Comments can be added\n" +
                   "         3 5 ADDER\n";
     updateUI();
 };
