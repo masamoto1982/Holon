@@ -270,69 +270,6 @@ const initializeBuiltins = () => {
         }
     }, { description: "Conditional execution", isBuiltin: true }));
     
-    // 辞書操作 - ここでDEFをネイティブ関数として実装
-    dictionaryOps.define("DEF", new Lambda(["wordName", "params", "body"], (env) => {
-        // DEF ADDER [ x y ] ( ADD x y ) 形式の処理
-        if (typeof env.wordName !== 'string' && !(env.wordName instanceof HolonString)) {
-            throw new Error("First argument must be a word name");
-        }
-        
-        const name = env.wordName instanceof HolonString ? env.wordName.value : env.wordName;
-        
-        if (!(env.params instanceof HolonList)) {
-            throw new Error("Second argument must be a parameter list");
-        }
-        
-        // パラメータ名のリストを文字列配列に変換
-        const paramNames = env.params.items.map(item => {
-            if (typeof item === 'string') return item;
-            if (item instanceof HolonString) return item.value;
-            throw new Error("Parameters must be strings");
-        });
-        
-        // ラムダ式を作成して辞書に登録
-        const lambda = new Lambda(
-            paramNames,
-            env.body, // 本体は評価済みのボディか、未評価のトークン配列
-            { description: `Custom word: ${name}`, isCustom: true }
-        );
-        
-        dictionaryOps.define(name, lambda);
-        return lambda;
-    }, { description: "Defines a new word", isBuiltin: true }));
-    
-    dictionaryOps.define("UNDEF", new Lambda(["name"], (env) => {
-        if (typeof env.name !== 'string' && !(env.name instanceof HolonString)) {
-            throw new Error("Argument must be a name");
-        }
-        
-        const wordName = env.name instanceof HolonString ? env.name.value : env.name;
-        return dictionaryOps.remove(wordName);
-    }, { description: "Removes a word from the dictionary", isBuiltin: true }));
-    
-    dictionaryOps.define("WORDS", new Lambda([], (env) => {
-        const words = dictionaryOps.listWords();
-        return new HolonString(words.join(" "));
-    }, { description: "Lists all words in the dictionary", isBuiltin: true }));
-    
-    // 関数適用
-    dictionaryOps.define("APPLY", new Lambda(["func", "args"], (env) => {
-        if (!(env.func instanceof Lambda)) {
-            throw new Error("First argument must be a lambda expression");
-        }
-        
-        let args = [];
-        if (env.args instanceof HolonList) {
-            args = env.args.items;
-        } else if (Array.isArray(env.args)) {
-            args = env.args;
-        } else {
-            args = [env.args];
-        }
-        
-        return env.func.apply(args);
-    }, { description: "Applies a function to arguments", isBuiltin: true }));
-    
     // 入出力
     dictionaryOps.define("PRINT", new Lambda(["value"], (env) => {
         let output;
@@ -590,18 +527,8 @@ const parseValue = token => {
         }
     }
     
-    // 辞書ワードの場合
-    if (typeof token === 'string') {
-        const normalizedToken = normalizeToken(token);
-        const word = dictionaryOps.lookup(normalizedToken);
-        if (word) {
-            log(`Found word in dictionary: ${normalizedToken}`);
-            return word;
-        }
-    }
-    
-    // 解析できない値はそのまま返す
-    return token;
+    // 解析できない場合は null を返す
+    return null;
 };
 
 // パラメータリストの解析
@@ -746,7 +673,11 @@ const parse = tokens => {
             
             while (j < tokens.length && tokens[j] !== ']') {
                 const value = parseValue(tokens[j]);
-                items.push(value);
+                if (value !== null) {
+                    items.push(value);
+                } else {
+                    items.push(tokens[j]);
+                }
                 j++;
             }
             
@@ -771,9 +702,14 @@ const parse = tokens => {
             continue;
         }
         
-        // 通常のトークン処理
+        // 数値や文字列などの値を解析
         const value = parseValue(token);
-        program.push(value);
+        if (value !== null) {
+            program.push(value);
+        } else {
+            // その他のトークン（ワード名など）
+            program.push(token);
+        }
         i++;
     }
     
@@ -781,19 +717,9 @@ const parse = tokens => {
     return program;
 };
 
-// 環境内の変数解決
-const resolveVariable = (name, env) => {
-    if (env && env[name] !== undefined) {
-        return env[name];
-    }
-    
-    // 辞書から探す
-    return dictionaryOps.lookup(name);
-};
-
 // 評価関数
 const evaluate = (program, env = {}) => {
-    log(`Evaluating program with ${program.length} elements`);
+    log(`Evaluating program with ${program.length} elements in environment: ${Object.keys(env).join(', ')}`);
     
     let result = null;
     let i = 0;
@@ -803,80 +729,88 @@ const evaluate = (program, env = {}) => {
         log(`Evaluating element ${i}: ${token}`);
         
         try {
-            // 値（数値、文字列、リスト）の場合
-            if (token instanceof Fraction || token instanceof HolonString || 
-                token instanceof HolonList) {
+            // 値（数値、文字列、リスト、ラムダ式）の場合
+            if (token instanceof Fraction || 
+                token instanceof HolonString || 
+                token instanceof HolonList ||
+                token instanceof Lambda) {
                 result = token;
                 i++;
                 continue;
             }
             
-            // ラムダ式の場合（直接値として使われる場合）
-            // ラムダ式の場合（直接値として使われる場合）
-            if (token instanceof Lambda) {
-                result = token;
+            // 環境変数の参照
+            if (typeof token === 'string' && env[token] !== undefined) {
+                result = env[token];
+                log(`Resolved environment variable ${token} to ${result}`);
                 i++;
                 continue;
             }
             
-            // 変数参照または辞書ワードの場合
+            // 辞書からワードを検索
             if (typeof token === 'string') {
-                // 環境内に変数があるか確認
-                const value = resolveVariable(token, env);
+                const wordName = normalizeToken(token);
+                const word = dictionaryOps.lookup(wordName);
                 
-                if (value === null) {
-                    throw new Error(`Unknown word or variable: ${token}`);
+                if (word === null) {
+                    throw new Error(`Unknown word: ${token}`);
                 }
                 
-                // ラムダ式の場合、適用が必要かチェック
-                if (value instanceof Lambda) {
-                    // ラムダ式の場合、必要な引数を集める
-                    const argsNeeded = value.params.length;
+                // ラムダ式の場合は適用
+                if (word instanceof Lambda) {
+                    const argsNeeded = word.params.length;
                     const args = [];
                     
-                    // 引数が足りない場合、エラー
+                    // 引数の数を確認
                     if (i + argsNeeded >= program.length) {
                         throw new Error(`Not enough arguments for ${token}, expected ${argsNeeded}`);
                     }
                     
-                    // 残りのトークンから引数を収集して評価
+                    // 引数を収集
                     for (let j = 0; j < argsNeeded; j++) {
-                        // 次のトークンを評価
-                        const nextToken = program[i + j + 1];
+                        const argPos = i + j + 1;
+                        const arg = program[argPos];
                         
-                        // 値として評価可能な場合
-                        if (nextToken instanceof Fraction || 
-                            nextToken instanceof HolonString || 
-                            nextToken instanceof HolonList ||
-                            nextToken instanceof Lambda) {
-                            args.push(nextToken);
-                        } else if (typeof nextToken === 'string') {
-                            // 変数または辞書ワードを解決
-                            const argValue = resolveVariable(nextToken, env);
-                            if (argValue === null) {
-                                throw new Error(`Unknown word or variable: ${nextToken}`);
+                        // 引数が値の場合
+                        if (arg instanceof Fraction || arg instanceof HolonString || 
+                            arg instanceof HolonList || arg instanceof Lambda) {
+                            args.push(arg);
+                        }
+                        // 引数が環境変数の場合
+                        else if (typeof arg === 'string' && env[arg] !== undefined) {
+                            args.push(env[arg]);
+                        }
+                        // 引数が辞書ワードの場合
+                        else if (typeof arg === 'string') {
+                            const argWordName = normalizeToken(arg);
+                            const argWord = dictionaryOps.lookup(argWordName);
+                            
+                            if (argWord === null) {
+                                throw new Error(`Unknown word: ${arg}`);
                             }
-                            args.push(argValue);
-                        } else {
-                            throw new Error(`Invalid argument: ${nextToken}`);
+                            
+                            args.push(argWord);
+                        }
+                        else {
+                            throw new Error(`Invalid argument type: ${arg}`);
                         }
                     }
                     
                     // ラムダ式を適用
-                    result = value.apply(args);
+                    result = word.apply(args);
                     
-                    // 処理した引数の分だけインデックスを進める
+                    // 処理した引数分だけインデックスを進める
                     i += argsNeeded + 1;
                 } else {
-                    // 値の場合はそのまま
-                    result = value;
+                    // ラムダ式でない場合は値をそのまま返す
+                    result = word;
                     i++;
                 }
             } else {
                 throw new Error(`Invalid token: ${token}`);
             }
         } catch (error) {
-            log(`Error evaluating token: ${error.message}`);
+            log(`Error during evaluation: ${error.message}`);
             throw error;
         }
     }
@@ -895,9 +829,13 @@ const executeCode = code => {
         const result = evaluate(program);
         log(`Result: ${result ? result.toString() : 'null'}`);
         
-        // 結果を出力に追加（あれば）
-        if (result && state.output.length > 0 && !state.output.endsWith('\n')) {
-            state.output += '\n';
+        // 結果が有意義な値なら出力に追加
+        if (result) {
+            // すでに出力がある場合は改行を挿入
+            if (state.output.length > 0 && !state.output.endsWith('\n')) {
+                state.output += '\n';
+            }
+            state.output += result.toString();
         }
         
         updateUI();
@@ -945,8 +883,7 @@ const init = () => {
     
     // ウェルカムメッセージ
     state.output = "Lambda-based Holon Interpreter\n" +
-                  "Type code and press Shift+Enter to execute\n" +
-                  "Example: DEF ADDER [ x y ] ( ADD x y ) #Comments can be added\n" +
+                  "Example: DEF ADDER [ x y ] ( ADD x y )\n" +
                   "         3 5 ADDER\n";
     updateUI();
 };
