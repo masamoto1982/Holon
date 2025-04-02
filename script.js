@@ -818,71 +818,96 @@ const updateUI = () => {
 };
 
 // 辞書ワードボタンの生成
+// 辞書ワードボタンの生成 - 修正版
 const renderDictionary = () => {
-   // 組み込みワード表示
-   elements.builtinWords.innerHTML = '<h3>Built-In Words</h3>';
-   
-   // 組み込みワードを取得
-   const builtinWords = Object.entries(state.dictionary)
-       .filter(([_, value]) => value instanceof Combinator && value.meta && value.meta.isBuiltin)
-       .map(([name]) => name)
-       .sort();
-   
-   builtinWords.forEach(word => {
-       const wordInfo = state.dictionary[word];
-       const meta = wordInfo.meta || {};
-       
-       const wordButton = document.createElement("button");
-       wordButton.textContent = word;
-       wordButton.title = meta.description || "";
-       wordButton.className = "word-button";
-       
-       // クリックイベント - 空白を追加しない
-       wordButton.addEventListener("click", () => {
-           const cursorPos = elements.input.selectionStart;
-           const textBefore = elements.input.value.substring(0, cursorPos);
-           const textAfter = elements.input.value.substring(cursorPos);
-           elements.input.value = textBefore + word + textAfter;
-           
-           // カーソル位置を更新
-           elements.input.selectionStart = elements.input.selectionEnd = cursorPos + word.length;
-           elements.input.focus();
-       });
-       
-       elements.builtinWords.appendChild(wordButton);
-   });
-   
-   // カスタムワード表示
-   elements.customWords.innerHTML = '<h3>Custom Words</h3>';
-   
-   // カスタムワードを取得
-   const customWords = Object.entries(state.dictionary)
-       .filter(([_, value]) => value instanceof Expression || (value instanceof Combinator && !value.meta.isBuiltin))
-       .map(([name]) => name)
-       .sort();
-   
-   customWords.forEach(word => {
-       const wordInfo = state.dictionary[word];
-       
-       const wordButton = document.createElement("button");
-       wordButton.textContent = word;
-       wordButton.title = wordInfo.toString();
-       wordButton.className = "word-button";
-       
-       // クリックイベント - 空白を追加しない
-       wordButton.addEventListener("click", () => {
-           const cursorPos = elements.input.selectionStart;
-           const textBefore = elements.input.value.substring(0, cursorPos);
-           const textAfter = elements.input.value.substring(cursorPos);
-           elements.input.value = textBefore + word + textAfter;
-           
-           // カーソル位置を更新
-           elements.input.selectionStart = elements.input.selectionEnd = cursorPos + word.length;
-           elements.input.focus();
-       });
-       
-       elements.customWords.appendChild(wordButton);
-   });
+    // 組み込みワード表示
+    elements.builtinWords.innerHTML = '<h3>Built-In Words</h3>';
+    
+    // 組み込みワードのグループ分け
+    const builtinGroups = {
+        // コンビネータ
+        combinators: ["I", "K", "S", "Y"],
+        // 四則演算
+        arithmetic: ["ADD", "SUB", "MUL", "DIV"],
+        // 比較演算
+        comparison: ["EQ", "LT", "GT"],
+        // 論理演算
+        logic: ["TRUE", "FALSE", "IF", "AND", "OR", "NOT"],
+        // ワード定義操作
+        wordOps: ["DEF", "DEL"],
+        // 出力
+        output: ["PRINT", "PRINTLN"]
+    };
+    
+    // 各グループごとにボタンを生成
+    Object.entries(builtinGroups).forEach(([groupName, words]) => {
+        const groupDiv = document.createElement("div");
+        groupDiv.className = "word-group";
+        
+        words.forEach(word => {
+            // 辞書に登録されているワードのみ表示
+            if (dictionaryOps.lookup(word)) {
+                const wordInfo = state.dictionary[word];
+                const meta = wordInfo.meta || {};
+                
+                const wordButton = document.createElement("button");
+                wordButton.textContent = word;
+                wordButton.title = meta.description || "";
+                wordButton.className = "word-button";
+                
+                // クリックイベント - 空白を追加しない
+                wordButton.addEventListener("click", () => {
+                    const cursorPos = elements.input.selectionStart;
+                    const textBefore = elements.input.value.substring(0, cursorPos);
+                    const textAfter = elements.input.value.substring(cursorPos);
+                    elements.input.value = textBefore + word + textAfter;
+                    
+                    // カーソル位置を更新
+                    elements.input.selectionStart = elements.input.selectionEnd = cursorPos + word.length;
+                    elements.input.focus();
+                });
+                
+                groupDiv.appendChild(wordButton);
+            }
+        });
+        
+        // グループに少なくとも1つのボタンがある場合のみ追加
+        if (groupDiv.children.length > 0) {
+            elements.builtinWords.appendChild(groupDiv);
+        }
+    });
+    
+    // カスタムワード表示
+    elements.customWords.innerHTML = '<h3>Custom Words</h3>';
+    
+    // カスタムワードを取得
+    const customWords = Object.entries(state.dictionary)
+        .filter(([_, value]) => value instanceof Expression || (value instanceof Combinator && !value.meta.isBuiltin))
+        .map(([name]) => name)
+        .sort();
+    
+    customWords.forEach(word => {
+        const wordInfo = state.dictionary[word];
+        
+        const wordButton = document.createElement("button");
+        wordButton.textContent = word;
+        wordButton.title = wordInfo.toString();
+        wordButton.className = "word-button";
+        
+        // クリックイベント - 空白を追加しない
+        wordButton.addEventListener("click", () => {
+            const cursorPos = elements.input.selectionStart;
+            const textBefore = elements.input.value.substring(0, cursorPos);
+            const textAfter = elements.input.value.substring(cursorPos);
+            elements.input.value = textBefore + word + textAfter;
+            
+            // カーソル位置を更新
+            elements.input.selectionStart = elements.input.selectionEnd = cursorPos + word.length;
+            elements.input.focus();
+        });
+        
+        elements.customWords.appendChild(wordButton);
+    });
 };
 
 // トークン分割
@@ -1049,14 +1074,37 @@ const parseDefinition = (tokens) => {
    }
 };
 
+// 削除文の解析関数を追加
+const parseDeleteCommand = (tokens) => {
+    if (tokens.length < 2 || normalizeToken(tokens[0]) !== 'DEL') {
+        return null;
+    }
+    
+    const wordName = tokens[1];
+    const normalizedName = normalizeToken(wordName);
+    
+    // 辞書から削除
+    const success = dictionaryOps.remove(normalizedName);
+    
+    return {
+        name: wordName,
+        success
+    };
+};
+
 // パーサー
 const parse = tokens => {
-   log(`Parsing ${tokens.length} tokens: ${tokens.join(' ')}`);
-   
-   // 定義文かどうかをチェック
-   if (tokens.length > 0 && normalizeToken(tokens[0]) === 'DEF') {
-       return parseDefinition(tokens);
-   }
+    log(`Parsing ${tokens.length} tokens: ${tokens.join(' ')}`);
+    
+    // 定義文かどうかをチェック
+    if (tokens.length > 0 && normalizeToken(tokens[0]) === 'DEF') {
+        return parseDefinition(tokens);
+    }
+    
+    // 削除文かどうかをチェック
+    if (tokens.length > 0 && normalizeToken(tokens[0]) === 'DEL') {
+        return parseDeleteCommand(tokens);
+    }
    
    // 通常の式を解析
    try {
@@ -1133,22 +1181,38 @@ const parse = tokens => {
 
 // 実行関数
 const executeCode = code => {
-   log(`==== Execution started ====`);
-   try {
-       log(`Input code: ${code}`);
-       const tokens = tokenize(code);
-       
-       // 定義文かどうかをチェック
-       if (tokens.length > 0 && normalizeToken(tokens[0]) === 'DEF') {
-           const definition = parse(tokens);
-           if (definition) {
-               state.output += `Defined: ${definition.name}\n`;
-               updateUI();
-               elements.input.value = "";
-               log(`Definition successful: ${definition.name}`);
-               return;
-           }
-       }
+    log(`==== Execution started ====`);
+    try {
+        log(`Input code: ${code}`);
+        const tokens = tokenize(code);
+        
+        // 定義文かどうかをチェック
+        if (tokens.length > 0 && normalizeToken(tokens[0]) === 'DEF') {
+            const definition = parse(tokens);
+            if (definition) {
+                state.output += `Defined: ${definition.name}\n`;
+                updateUI();
+                elements.input.value = "";
+                log(`Definition successful: ${definition.name}`);
+                return;
+            }
+        }
+        
+        // 削除文かどうかをチェック
+        if (tokens.length > 0 && normalizeToken(tokens[0]) === 'DEL') {
+            const deleteResult = parse(tokens);
+            if (deleteResult) {
+                if (deleteResult.success) {
+                    state.output += `Removed: ${deleteResult.name}\n`;
+                } else {
+                    state.output += `Word not found: ${deleteResult.name}\n`;
+                }
+                updateUI();
+                elements.input.value = "";
+                log(`Delete command executed for: ${deleteResult.name}`);
+                return;
+            }
+        }
        
        // 通常の式を評価
        const result = parse(tokens);
@@ -1215,7 +1279,6 @@ const init = () => {
    
    // ウェルカムメッセージ
    state.output = "Holon Combinatory Logic\n" +
-                 "Type code and press Shift+Enter to execute\n" +
                  "Example: DEF ADDER (S (K ADD) I)\n" +
                  "         ADDER 3 5\n";
    updateUI();
