@@ -1027,7 +1027,59 @@ const initializeBuiltins = () => {
       isBuiltin: true
     }
   ));
-// シンボル演算子 - 四則演算
+
+  // DEF（定義）コンビネータ
+  dictionaryOps.define("DEF", new Combinator(
+    (operands) => {
+      if (operands.length < 2) throw new Error("DEF requires a name and a value");
+      const name = operands[0];
+      const value = operands[1];
+      
+      // 名前として文字列か識別子を受け入れる
+      let wordName;
+      if (name instanceof HolonString) {
+        wordName = name.value;
+      } else if (typeof name === 'string') {
+        wordName = name;
+      } else {
+        wordName = name.toString();
+      }
+      
+      return dictionaryOps.define(wordName, value);
+    }, {
+      name: "DEF",
+      description: "Defines a new word: DEF name value",
+      isBuiltin: true
+    }
+  ));
+
+  // DEL（削除）コンビネータ
+  dictionaryOps.define("DEL", new Combinator(
+    (operands) => {
+      if (operands.length < 1) throw new Error("DEL requires a name");
+      const name = operands[0];
+      
+      // 名前として文字列か識別子を受け入れる
+      let wordName;
+      if (name instanceof HolonString) {
+        wordName = name.value;
+      } else if (typeof name === 'string') {
+        wordName = name;
+      } else {
+        wordName = name.toString();
+      }
+      
+      return dictionaryOps.remove(wordName) ? 
+        new Fraction(1, 1) : 
+        new Fraction(0, 1);
+    }, {
+      name: "DEL",
+      description: "Deletes a word: DEL name",
+      isBuiltin: true
+    }
+  ));
+
+  // シンボル演算子 - 四則演算
   dictionaryOps.define("+", dictionaryOps.lookup("ADD"));
   dictionaryOps.define("-", dictionaryOps.lookup("SUB"));
   dictionaryOps.define("*", dictionaryOps.lookup("MUL"));
@@ -1037,8 +1089,7 @@ const initializeBuiltins = () => {
   dictionaryOps.define("==", dictionaryOps.lookup("EQ"));
   dictionaryOps.define("<", dictionaryOps.lookup("LT"));
   dictionaryOps.define(">", dictionaryOps.lookup("GT"));
-  };
-
+};
 
 // UI要素の取得
 const elements = {
@@ -1058,13 +1109,11 @@ const updateUI = () => {
 };
 
 // 辞書ワードボタンの生成
-// 辞書ワードボタンの生成 - 修正版
 const renderDictionary = () => {
   // 組み込みワード表示
   elements.builtinWords.innerHTML = '<h3>Built-In Words</h3>';
 
   // 組み込みワードのグループ分け
-  // renderDictionary 関数内の builtinGroups を更新
   const builtinGroups = {
     // コンビネータ
     combinators: ["I", "K", "S", "Y"],
@@ -1073,7 +1122,7 @@ const renderDictionary = () => {
     // 比較演算
     comparison: ["==", "<", ">"],
     // 論理演算
-    logic: ["TRUE", "FALSE", "IF", "AND", "OR", "NOT"],
+    logic: ["TRUE", "FALSE", "IF"],
     // ワード定義操作
     wordOps: ["DEF", "DEL"],
     // 出力
@@ -1219,6 +1268,8 @@ const tokenize = code => {
 };
 
 // 式の解析
+// パーサーの修正版（既存のコードと置き換えてください）
+// 式の解析
 const parseExpression = (tokens, startIndex) => {
   // 現在のトークンがリテラルまたは名前の場合
   if (tokens[startIndex] !== '(') {
@@ -1296,67 +1347,41 @@ const parseExpression = (tokens, startIndex) => {
   };
 };
 
-// 定義文の解析
-const parseDefinition = (tokens) => {
-  if (tokens.length < 4 || normalizeToken(tokens[0]) !== 'DEF') {
-    return null;
-  }
-
-  const name = tokens[1];
-
-  // 式を解析
-  let expressionTokens = tokens.slice(2);
-  if (expressionTokens[0] === '(') {
-    const {
-      expr
-    } = parseExpression(expressionTokens, 0);
-
-    // 辞書に登録
-    dictionaryOps.define(name, expr);
-
-    return {
-      name,
-      expr
-    };
-  } else {
-    throw new Error("Expected an expression after word name in DEF");
-  }
-};
-
-// 削除文の解析関数を追加
-const parseDeleteCommand = (tokens) => {
-  if (tokens.length < 2 || normalizeToken(tokens[0]) !== 'DEL') {
-    return null;
-  }
-
-  const wordName = tokens[1];
-  const normalizedName = normalizeToken(wordName);
-
-  // 辞書から削除
-  const success = dictionaryOps.remove(normalizedName);
-
-  return {
-    name: wordName,
-    success
-  };
-};
-
 // パーサー
 const parse = tokens => {
   log(`Parsing ${tokens.length} tokens: ${tokens.join(' ')}`);
 
-  // 定義文かどうかをチェック
-  if (tokens.length > 0 && normalizeToken(tokens[0]) === 'DEF') {
-    return parseDefinition(tokens);
-  }
-
-  // 削除文かどうかをチェック
-  if (tokens.length > 0 && normalizeToken(tokens[0]) === 'DEL') {
-    return parseDeleteCommand(tokens);
-  }
-
-  // 通常の式を解析
   try {
+    // DEF の処理
+    if (tokens.length >= 3 && normalizeToken(tokens[0]) === "DEF") {
+      const name = tokens[1];
+      
+      // 残りのトークンから式を解析
+      const defTokens = tokens.slice(2);
+      let defExpr;
+      
+      // 括弧があるかチェック
+      if (defTokens[0] === '(' && defTokens[defTokens.length - 1] === ')') {
+        // 括弧付きの式を解析
+        const { expr } = parseExpression(defTokens, 0);
+        defExpr = expr;
+      } else {
+        // 単一トークンの場合
+        defExpr = parse(defTokens);
+      }
+      
+      // 辞書に定義
+      dictionaryOps.define(name, defExpr);
+      return new Fraction(1, 1); // 成功を示す値
+    }
+    
+    // DEL の処理
+    if (tokens.length >= 2 && normalizeToken(tokens[0]) === "DEL") {
+      const name = tokens[1];
+      const success = dictionaryOps.remove(name);
+      return new Fraction(success ? 1 : 0, 1);
+    }
+
     // 単一のワード実行
     if (tokens.length === 1) {
       const token = tokens[0];
@@ -1387,15 +1412,37 @@ const parse = tokens => {
     // 複数のワード（関数適用）
     if (tokens.length >= 2) {
       // 最初のトークンが辞書ワードで、他のトークンが引数の場合
-      const funcName = normalizeToken(tokens[0]);
-      const func = dictionaryOps.lookup(funcName);
+      const func = dictionaryOps.lookup(normalizeToken(tokens[0]));
 
       if (func !== null) {
         // 残りのトークンを引数として評価
         const args = [];
         for (let i = 1; i < tokens.length; i++) {
-          const arg = parse([tokens[i]]);
-          args.push(arg);
+          // 括弧があればそれを式として解析
+          if (tokens[i] === '(') {
+            // 対応する閉じ括弧を見つける
+            let bracketCount = 1;
+            let j = i + 1;
+            
+            while (j < tokens.length && bracketCount > 0) {
+              if (tokens[j] === '(') bracketCount++;
+              if (tokens[j] === ')') bracketCount--;
+              j++;
+            }
+            
+            if (bracketCount !== 0) {
+              throw new Error("Unmatched brackets");
+            }
+            
+            // 括弧内の式を解析
+            const subTokens = tokens.slice(i, j);
+            const arg = parse(subTokens);
+            args.push(arg);
+            i = j - 1; // iは次のループでインクリメントされる
+          } else {
+            const arg = parse([tokens[i]]);
+            args.push(arg);
+          }
         }
 
         // 関数を適用
@@ -1416,15 +1463,16 @@ const parse = tokens => {
 
     // 括弧で囲まれた式
     if (tokens[0] === '(' && tokens[tokens.length - 1] === ')') {
-      const {
-        expr
-      } = parseExpression(tokens, 0);
+      const { expr } = parseExpression(tokens, 0);
       return expr;
-    } else {
-      const {
-        expr
-      } = parseExpression(['(', ...tokens, ')'], 0);
+    }
+
+    // それ以外の場合は式として解析
+    try {
+      const { expr } = parseExpression(['(', ...tokens, ')'], 0);
       return expr;
+    } catch (e) {
+      throw new Error(`Failed to parse expression: ${e.message}`);
     }
   } catch (error) {
     log(`Parse error: ${error.message}`);
@@ -1439,60 +1487,53 @@ const executeCode = code => {
     log(`Input code: ${code}`);
     const tokens = tokenize(code);
 
-    // 定義文かどうかをチェック
-    if (tokens.length > 0 && normalizeToken(tokens[0]) === 'DEF') {
-      const definition = parse(tokens);
-      if (definition) {
-        state.output += `Defined: ${definition.name}\n`;
-        updateUI();
-        elements.input.value = "";
-        log(`Definition successful: ${definition.name}`);
-        return;
-      }
-    }
-
-    // 削除文かどうかをチェック
-    if (tokens.length > 0 && normalizeToken(tokens[0]) === 'DEL') {
-      const deleteResult = parse(tokens);
-      if (deleteResult) {
-        if (deleteResult.success) {
-          state.output += `Removed: ${deleteResult.name}\n`;
-        } else {
-          state.output += `Word not found: ${deleteResult.name}\n`;
-        }
-        updateUI();
-        elements.input.value = "";
-        log(`Delete command executed for: ${deleteResult.name}`);
-        return;
-      }
-    }
+    // DEFやDELコマンドか確認
+    const isDefinition = tokens.length >= 2 && normalizeToken(tokens[0]) === "DEF";
+    const isDeletion = tokens.length >= 2 && normalizeToken(tokens[0]) === "DEL";
 
     // 通常の式を評価
     const result = parse(tokens);
     log(`Parsed expression result: ${result}`);
 
-    // 最終結果の評価
-    let finalResult;
-    if (result instanceof Expression) {
-      finalResult = result.evaluate();
-    } else if (result instanceof Combinator) {
-      // コンビネータは引数がないとそのまま返す
-      finalResult = result;
+    // DEFやDELコマンドの場合は特別な出力処理
+    if (isDefinition) {
+      state.output += `Defined: ${tokens[1]}\n`;
+      updateUI();
+      elements.input.value = "";
+      log(`Definition successful: ${tokens[1]}`);
+    } else if (isDeletion) {
+      if (result instanceof Fraction && result.numerator === 1) {
+        state.output += `Removed: ${tokens[1]}\n`;
+      } else {
+        state.output += `Word not found: ${tokens[1]}\n`;
+      }
+      updateUI();
+      elements.input.value = "";
+      log(`Delete command executed for: ${tokens[1]}`);
     } else {
-      finalResult = result;
+      // 通常の式の場合、最終結果を評価して出力
+      let finalResult;
+      if (result instanceof Expression) {
+        finalResult = result.evaluate();
+      } else if (result instanceof Combinator) {
+        // コンビネータは引数がないとそのまま返す
+        finalResult = result;
+      } else {
+        finalResult = result;
+      }
+
+      log(`Final result: ${finalResult}`);
+
+      // 結果を出力
+      if (state.output.length > 0 && !state.output.endsWith('\n')) {
+        state.output += '\n';
+      }
+      state.output += finalResult.toString();
+
+      updateUI();
+      elements.input.value = "";
+      log(`Execution successful`);
     }
-
-    log(`Final result: ${finalResult}`);
-
-    // 結果を出力
-    if (state.output.length > 0 && !state.output.endsWith('\n')) {
-      state.output += '\n';
-    }
-    state.output += finalResult.toString();
-
-    updateUI();
-    elements.input.value = "";
-    log(`Execution successful`);
   } catch (error) {
     log(`Error: ${error.message}`);
     state.output += `Error: ${error.message}\n`;
@@ -1532,7 +1573,7 @@ const init = () => {
 
   // ウェルカムメッセージ
   state.output = "Holon Combinatory Logic\n" +
-    "Example: DEF ADDER (S (K ADD) I)\n" +
+    "Example: DEF ADDER (S (K +) I)\n" +
     "         ADDER 3 5\n";
   updateUI();
 };
