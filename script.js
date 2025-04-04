@@ -1027,9 +1027,19 @@ const initializeBuiltins = () => {
       isBuiltin: true
     }
   ));
-};
+// シンボル演算子 - 四則演算
+  dictionaryOps.define("+", dictionaryOps.lookup("ADD"));
+  dictionaryOps.define("-", dictionaryOps.lookup("SUB"));
+  dictionaryOps.define("*", dictionaryOps.lookup("MUL"));
+  dictionaryOps.define("/", dictionaryOps.lookup("DIV"));
+  
+  // シンボル演算子 - 比較
+  dictionaryOps.define("==", dictionaryOps.lookup("EQ"));
+  dictionaryOps.define("<", dictionaryOps.lookup("LT"));
+  dictionaryOps.define(">", dictionaryOps.lookup("GT"));
+  };
 
-// UI要素の取得
+
 // UI要素の取得
 const elements = {
   output: document.querySelector('.output-box p'),
@@ -1054,13 +1064,14 @@ const renderDictionary = () => {
   elements.builtinWords.innerHTML = '<h3>Built-In Words</h3>';
 
   // 組み込みワードのグループ分け
+  // renderDictionary 関数内の builtinGroups を更新
   const builtinGroups = {
     // コンビネータ
     combinators: ["I", "K", "S", "Y"],
     // 四則演算
-    arithmetic: ["ADD", "SUB", "MUL", "DIV"],
+    arithmetic: ["+", "-", "*", "/"],
     // 比較演算
-    comparison: ["EQ", "LT", "GT"],
+    comparison: ["==", "<", ">"],
     // 論理演算
     logic: ["TRUE", "FALSE", "IF", "AND", "OR", "NOT"],
     // ワード定義操作
