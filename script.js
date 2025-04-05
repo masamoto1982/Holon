@@ -1481,11 +1481,21 @@ const parse = tokens => {
   }
 };
 
-// 実行関数
+// 実行関数// 実行関数 - ウェルカムメッセージを初回実行時にクリアする機能を追加
 const executeCode = code => {
   log(`==== Execution started ====`);
   try {
     log(`Input code: ${code}`);
+    
+    // ウェルカムメッセージかどうかを確認するフラグ
+    const isFirstExecution = state.output.includes("Holon Combinatory Logic") && 
+                            state.output.includes("Example: DEF ADDER");
+    
+    // ウェルカムメッセージの場合はクリア
+    if (isFirstExecution) {
+      state.output = "";
+    }
+    
     const tokens = tokenize(code);
 
     // DEFやDELコマンドか確認
@@ -1536,6 +1546,11 @@ const executeCode = code => {
       log(`Execution successful`);
     }
   } catch (error) {
+    // エラー時もウェルカムメッセージをクリア
+    if (state.output.includes("Holon Combinatory Logic")) {
+      state.output = "";
+    }
+    
     log(`Error: ${error.message}`);
     state.output += `Error: ${error.message}\n`;
     updateUI();
