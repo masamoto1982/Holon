@@ -1101,8 +1101,9 @@ const elements = {
 
 // UI更新関数
 const updateUI = () => {
-  // 出力エリア更新
-  elements.output.textContent = state.output;
+  // 出力エリア更新 - p タグを使わずに直接設定
+  const outputBox = document.querySelector('.output-box');
+  outputBox.textContent = state.output;  // innerHTML ではなく textContent を使用
 
   // 辞書ワード表示更新
   renderDictionary();
