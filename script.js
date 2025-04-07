@@ -1,10 +1,12 @@
-// script.js - Holon language with Lazy K inspired combinatory logic
+// script.js - Holon language with FORTH inspired stack-based logic
 
-// データ構造 - 辞書とログの管理
+// データ構造 - スタック、レジスタ、辞書とログの管理
 const state = {
-  dictionary: {}, // ワード辞書（コンビネータをマップに格納）
-  output: "",
-  logs: []
+  stack: [],          // メインスタック
+  registers: {},      // レジスタ（名前付き変数）
+  dictionary: {},     // ワード辞書
+  output: "",         // 出力バッファ
+  logs: []            // デバッグログ
 };
 
 // デバッグログ機能
@@ -16,7 +18,7 @@ const log = message => {
 // トークンを正規化（大文字に変換）する関数
 const normalizeToken = token => token.toUpperCase();
 
-// 分数クラス
+// 分数クラス（既存のコードから流用）
 class Fraction {
   constructor(numerator, denominator = 1) {
     if (denominator === 0) {
@@ -101,104 +103,132 @@ class HolonString {
   }
 }
 
-// コンビネータ（関数）クラス
-class Combinator {
-  constructor(apply, meta = {}) {
-    this.apply = apply; // 関数適用関数
-    this.meta = meta; // メタデータ（説明など）
-  }
+// スタック操作ユーティリティ
+const stackOps = {
+  // スタックにプッシュ
+  push: (value) => {
+    state.stack.push(value);
+    log(`Pushed to stack: ${value}`);
+    return value;
+  },
 
-  toString() {
-    const name = this.meta.name || "anonymous";
-    return `<${name}>`;
-  }
-}
-
-// 式クラス - 適用可能な式を表現
-class Expression {
-  constructor(operator, operands = []) {
-    this.operator = operator; // 演算子（関数）
-    this.operands = operands; // オペランド（引数）
-  }
-
-  // 式の評価 - 遅延評価を行う
-  evaluate() {
-    log(`Evaluating expression: ${this.toString()}`);
-
-    // オペレータが特殊値の場合
-    if (this.operator instanceof Fraction ||
-      this.operator instanceof HolonString) {
-      return this.operator;
+  // スタックからポップ
+  pop: () => {
+    if (state.stack.length === 0) {
+      throw new Error("Stack underflow");
     }
+    const value = state.stack.pop();
+    log(`Popped from stack: ${value}`);
+    return value;
+  },
 
-    // 各オペランドを評価
-    const evaluatedOperands = this.operands.map(op =>
-      op instanceof Expression ? op.evaluate() : op
-    );
-
-    // オペレータがコンビネータの場合
-    if (this.operator instanceof Combinator) {
-      log(`Applying combinator: ${this.operator.meta.name || 'anonymous'}`);
-      return this.operator.apply(evaluatedOperands);
+  // スタックの先頭要素を覗く（削除せず）
+  peek: () => {
+    if (state.stack.length === 0) {
+      return null;
     }
+    return state.stack[state.stack.length - 1];
+  },
 
-    // オペレータが式の場合、まず評価する
-    if (this.operator instanceof Expression) {
-      log(`Evaluating operator expression first`);
-      const evaluatedOperator = this.operator.evaluate();
+  // スタックをクリア
+  clear: () => {
+    state.stack = [];
+    log("Stack cleared");
+  },
 
-      // 評価結果を処理
-      if (evaluatedOperator instanceof Combinator) {
-        // コンビネータなら適用
-        log(`Evaluated operator is a combinator, applying`);
-        return evaluatedOperator.apply(evaluatedOperands);
-      } else if (evaluatedOperator instanceof Expression) {
-        // 式ならさらに評価
-        log(`Evaluated operator is an expression, evaluating again`);
-        return new Expression(evaluatedOperator, evaluatedOperands).evaluate();
-      } else {
-        // その他の値なら新しい式として評価
-        log(`Evaluated operator is a value: ${evaluatedOperator}`);
-        return evaluatedOperator;
-      }
+  // スタックのサイズを取得
+  size: () => {
+    return state.stack.length;
+  }
+};
+
+// レジスタ操作ユーティリティ
+const registerOps = {
+  // レジスタに値を設定
+  set: (name, value) => {
+    const normalizedName = normalizeToken(name);
+    state.registers[normalizedName] = value;
+    log(`Register ${normalizedName} set to: ${value}`);
+    return value;
+  },
+
+  // レジスタから値を取得
+  get: (name) => {
+    const normalizedName = normalizeToken(name);
+    const value = state.registers[normalizedName];
+    if (value === undefined) {
+      log(`Register ${normalizedName} not found`);
+      return null;
     }
+    log(`Retrieved register ${normalizedName}: ${value}`);
+    return value;
+  },
 
-    throw new Error(`Cannot evaluate expression with operator: ${this.operator}`);
-  }
+  // レジスタを削除
+  remove: (name) => {
+    const normalizedName = normalizeToken(name);
+    if (state.registers[normalizedName] !== undefined) {
+      delete state.registers[normalizedName];
+      log(`Removed register ${normalizedName}`);
+      return true;
+    }
+    log(`Register ${normalizedName} not found for removal`);
+    return false;
+  },
 
-  toString() {
-    const opStr = this.operator ? this.operator.toString() : 'null';
-    const argsStr = this.operands.map(o => o ? o.toString() : 'null').join(' ');
-    return `(${opStr} ${argsStr})`;
+  // すべてのレジスタを取得
+  getAll: () => {
+    return { ...state.registers };
   }
-}
+};
 
 // 辞書操作ユーティリティ
 const dictionaryOps = {
   // 辞書にワードを定義
-  define: (name, value) => {
+  define: (name, func, isBuiltin = false, description = '') => {
     const normalizedName = normalizeToken(name);
-    state.dictionary[normalizedName] = value;
-    log(`Defined word "${normalizedName}" in dictionary: ${value.toString()}`);
-    return value;
+    state.dictionary[normalizedName] = {
+      func: func,
+      isBuiltin: isBuiltin,
+      description: description
+    };
+    log(`Defined word "${normalizedName}" in dictionary`);
+    return func;
   },
 
   // 辞書からワードを取得
   lookup: (name) => {
     const normalizedName = normalizeToken(name);
-    const value = state.dictionary[normalizedName];
-    if (value === undefined) {
+    const entry = state.dictionary[normalizedName];
+    if (entry === undefined) {
       log(`Word "${normalizedName}" not found in dictionary`);
       return null;
     }
-    log(`Found word "${normalizedName}" in dictionary: ${value.toString()}`);
-    return value;
+    log(`Found word "${normalizedName}" in dictionary`);
+    return entry.func;
+  },
+
+  // 辞書からワードのメタデータを取得
+  getMetadata: (name) => {
+    const normalizedName = normalizeToken(name);
+    const entry = state.dictionary[normalizedName];
+    if (entry === undefined) {
+      return null;
+    }
+    return {
+      isBuiltin: entry.isBuiltin,
+      description: entry.description
+    };
   },
 
   // 辞書からワードを削除
   remove: (name) => {
     const normalizedName = normalizeToken(name);
     if (state.dictionary[normalizedName] !== undefined) {
+      if (state.dictionary[normalizedName].isBuiltin) {
+        log(`Cannot remove built-in word "${normalizedName}"`);
+        return false;
+      }
       delete state.dictionary[normalizedName];
       log(`Removed word "${normalizedName}" from dictionary`);
       return true;
@@ -210,995 +240,612 @@ const dictionaryOps = {
   // 辞書の全ワードのリスト取得
   listWords: () => {
     return Object.keys(state.dictionary);
+  },
+  
+  // 組み込みワードのリスト取得
+  listBuiltinWords: () => {
+    return Object.entries(state.dictionary)
+      .filter(([_, entry]) => entry.isBuiltin)
+      .map(([name]) => name);
+  },
+  
+  // カスタムワードのリスト取得
+  listCustomWords: () => {
+    return Object.entries(state.dictionary)
+      .filter(([_, entry]) => !entry.isBuiltin)
+      .map(([name]) => name);
   }
 };
 
-// 基本コンビネータの初期化
+// ポケベル信号の定義
+const pagerTones = {
+  // 各数字に対応するポケベル信号の周波数と長さ
+  '1': [{ freq: 1400, duration: 100 }, { freq: 1000, duration: 100 }],
+  '2': [{ freq: 1400, duration: 100 }, { freq: 1100, duration: 100 }],
+  '3': [{ freq: 1400, duration: 100 }, { freq: 1200, duration: 100 }],
+  '4': [{ freq: 1400, duration: 100 }, { freq: 1300, duration: 100 }],
+  '5': [{ freq: 1400, duration: 100 }, { freq: 1400, duration: 100 }],
+  '6': [{ freq: 1500, duration: 100 }, { freq: 1000, duration: 100 }],
+  '7': [{ freq: 1500, duration: 100 }, { freq: 1100, duration: 100 }],
+  '8': [{ freq: 1500, duration: 100 }, { freq: 1200, duration: 100 }],
+  '9': [{ freq: 1500, duration: 100 }, { freq: 1300, duration: 100 }],
+  '0': [{ freq: 1500, duration: 100 }, { freq: 1400, duration: 100 }],
+  '*': [{ freq: 1600, duration: 100 }, { freq: 1000, duration: 100 }],
+  '#': [{ freq: 1600, duration: 100 }, { freq: 1100, duration: 100 }]
+};
+
+// ポケベル信号を再生する関数
+const playPagerTone = (digit) => {
+  // AudioContextがサポートされているか確認
+  if (!window.AudioContext && !window.webkitAudioContext) {
+    log("AudioContext is not supported in this browser");
+    return;
+  }
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  const audioCtx = new AudioContext();
+  
+  // 指定された数字のポケベル信号を取得
+  const tones = pagerTones[digit];
+  if (!tones) {
+    log(`No tone defined for digit: ${digit}`);
+    return;
+  }
+  
+  // 各音を順番に再生
+  let startTime = audioCtx.currentTime;
+  
+  tones.forEach(tone => {
+    const oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    oscillator.type = 'sine';
+    oscillator.frequency.value = tone.freq;
+    
+    gainNode.gain.value = 0.5;
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    oscillator.start(startTime);
+    oscillator.stop(startTime + tone.duration / 1000);
+    
+    startTime += tone.duration / 1000;
+  });
+};
+
+// 基本機能ワードの初期化
 const initializeBuiltins = () => {
-  // 直接適用の関数を定義
-  const directApply = (func) => {
-    return (operands) => {
-      log(`Direct application with ${operands.length} operands`);
-      if (operands.length === 0) return null;
+  // 基本的なFORTHワードのマッピング
+  const forthWords = [
+    { digit: '1', word: 'DUP', description: 'スタックの最上位の値を複製します' },
+    { digit: '2', word: 'DROP', description: 'スタックの最上位の値を捨てます' },
+    { digit: '3', word: 'SWAP', description: 'スタックの上位2つの値を入れ替えます' },
+    { digit: '4', word: 'OVER', description: '2番目の値のコピーをスタックの最上位に置きます' },
+    { digit: '5', word: 'ROT', description: '上位3つの値をローテーションします (a b c -> b c a)' },
+    { digit: '6', word: '+', description: 'スタックの上位2つの値を加算します' },
+    { digit: '7', word: '-', description: 'スタックの上位2つの値を減算します (a b -> a-b)' },
+    { digit: '8', word: '*', description: 'スタックの上位2つの値を乗算します' },
+    { digit: '9', word: '/', description: 'スタックの上位2つの値を除算します (a b -> a/b)' },
+    { digit: '0', word: 'IF', description: '条件分岐を行います' },
+    { digit: '*', word: 'DEF', description: '新しいワードを定義します' },
+    { digit: '#', word: 'DEL', description: 'ワードを削除します' }
+  ];
 
-      // 最初の引数を関数に適用
-      const result = func(operands[0]);
+  // ワードと数字のマッピングを保存
+  state.wordDigitMap = {};
+  forthWords.forEach(item => {
+    state.wordDigitMap[item.digit] = item.word;
+  });
 
-      // 残りの引数があれば、結果に適用する
-      if (operands.length > 1) {
-        if (result instanceof Combinator) {
-          return result.apply(operands.slice(1));
-        } else {
-          // 関数でない場合は直接返す
-          return result;
-        }
-      } else {
-        return result;
-      }
-    };
-  };
+  // 各ワードを定義
+  // スタック操作
+  dictionaryOps.define("DUP", () => {
+    if (state.stack.length < 1) throw new Error("DUP requires at least one item on the stack");
+    const value = stackOps.peek();
+    stackOps.push(value);
+  }, true, 'スタックの最上位の値を複製します');
 
-  // 恒等関数 I コンビネータ: I x = x
-  dictionaryOps.define("I", new Combinator(
-    directApply(x => x), {
-      name: "I",
-      description: "Identity: I x = x",
-      isBuiltin: true
-    }
-  ));
+  dictionaryOps.define("DROP", () => {
+    if (state.stack.length < 1) throw new Error("DROP requires at least one item on the stack");
+    stackOps.pop();
+  }, true, 'スタックの最上位の値を捨てます');
 
-  // K コンビネータ: K x y = x (定数関数)
-  dictionaryOps.define("K", new Combinator(
-    (operands) => {
-      log(`K combinator called with ${operands.length} operands`);
+  dictionaryOps.define("SWAP", () => {
+    if (state.stack.length < 2) throw new Error("SWAP requires at least two items on the stack");
+    const a = stackOps.pop();
+    const b = stackOps.pop();
+    stackOps.push(a);
+    stackOps.push(b);
+  }, true, 'スタックの上位2つの値を入れ替えます');
 
-      // 完全適用
-      if (operands.length >= 2) {
-        return operands[0];
-      }
+  dictionaryOps.define("OVER", () => {
+    if (state.stack.length < 2) throw new Error("OVER requires at least two items on the stack");
+    const a = stackOps.pop();
+    const b = stackOps.peek();
+    stackOps.push(a);
+    stackOps.push(b);
+  }, true, '2番目の値のコピーをスタックの最上位に置きます');
 
-      // 部分適用
-      if (operands.length === 1) {
-        const x = operands[0];
-        return new Combinator(
-          directApply(_ => x), {
-            name: "K-partial",
-            description: "K x - returns x regardless of argument"
-          }
-        );
-      }
-
-      // 引数なし
-      return new Combinator(
-        (newOperands) => {
-          if (newOperands.length === 0) return null;
-          const x = newOperands[0];
-          return new Combinator(
-            directApply(_ => x), {
-              name: "K-partial",
-              description: "K x - returns x regardless of argument"
-            }
-          );
-        }, {
-          name: "K",
-          description: "Constant function constructor",
-          isBuiltin: true
-        }
-      );
-    }, {
-      name: "K",
-      description: "Constant: K x y = x",
-      isBuiltin: true
-    }
-  ));
-
-  // S コンビネータ: S x y z = x z (y z)
-  dictionaryOps.define("S", new Combinator(
-    (operands) => {
-      log(`S combinator called with ${operands.length} operands`);
-
-      // 完全適用
-      if (operands.length >= 3) {
-        const [x, y, z] = operands;
-
-        log(`S: applying x=${x} to z=${z}`);
-        // x z を適用
-        let xzResult;
-        if (x instanceof Combinator) {
-          xzResult = x.apply([z]);
-        } else if (x instanceof Expression) {
-          xzResult = new Expression(x, [z]).evaluate();
-        } else {
-          xzResult = x; // x が値の場合
-        }
-        log(`S: x z = ${xzResult}`);
-
-        log(`S: applying y=${y} to z=${z}`);
-        // y z を適用
-        let yzResult;
-        if (y instanceof Combinator) {
-          yzResult = y.apply([z]);
-        } else if (y instanceof Expression) {
-          yzResult = new Expression(y, [z]).evaluate();
-        } else {
-          yzResult = y; // y が値の場合
-        }
-        log(`S: y z = ${yzResult}`);
-
-        log(`S: applying xz=${xzResult} to yz=${yzResult}`);
-        // (x z) (y z) を適用
-        if (xzResult instanceof Combinator) {
-          return xzResult.apply([yzResult]);
-        } else if (xzResult instanceof Expression) {
-          return new Expression(xzResult, [yzResult]).evaluate();
-        } else {
-          return xzResult; // xz が値の場合
-        }
-      }
-
-      // 部分適用
-      if (operands.length === 2) {
-        const [x, y] = operands;
-        return new Combinator(
-          (newOperands) => {
-            if (newOperands.length === 0) return null;
-
-            const z = newOperands[0];
-
-            log(`S-partial: applying x=${x} to z=${z}`);
-            // x z を適用
-            let xzResult;
-            if (x instanceof Combinator) {
-              xzResult = x.apply([z]);
-            } else if (x instanceof Expression) {
-              xzResult = new Expression(x, [z]).evaluate();
-            } else {
-              xzResult = x;
-            }
-            log(`S-partial: x z = ${xzResult}`);
-
-            log(`S-partial: applying y=${y} to z=${z}`);
-            // y z を適用
-            let yzResult;
-            if (y instanceof Combinator) {
-              yzResult = y.apply([z]);
-            } else if (y instanceof Expression) {
-              yzResult = new Expression(y, [z]).evaluate();
-            } else {
-              yzResult = y;
-            }
-            log(`S-partial: y z = ${yzResult}`);
-
-            log(`S-partial: applying xz=${xzResult} to yz=${yzResult}`);
-            // (x z) (y z) を適用
-            if (xzResult instanceof Combinator) {
-              return xzResult.apply([yzResult]);
-            } else if (xzResult instanceof Expression) {
-              return new Expression(xzResult, [yzResult]).evaluate();
-            } else {
-              return xzResult;
-            }
-          }, {
-            name: "S-partial-xy",
-            description: "S x y - waits for z"
-          }
-        );
-      }
-
-      if (operands.length === 1) {
-        const x = operands[0];
-        return new Combinator(
-          (newOperands) => {
-            if (newOperands.length === 0) return null;
-
-            if (newOperands.length === 1) {
-              const y = newOperands[0];
-              return new Combinator(
-                (finalOperands) => {
-                  if (finalOperands.length === 0) return null;
-
-                  const z = finalOperands[0];
-
-                  log(`S-partial-x: applying x=${x} to z=${z}`);
-                  // x z を適用
-                  let xzResult;
-                  if (x instanceof Combinator) {
-                    xzResult = x.apply([z]);
-                  } else if (x instanceof Expression) {
-                    xzResult = new Expression(x, [z]).evaluate();
-                  } else {
-                    xzResult = x;
-                  }
-                  log(`S-partial-x: x z = ${xzResult}`);
-
-                  log(`S-partial-x: applying y=${y} to z=${z}`);
-                  // y z を適用
-                  let yzResult;
-                  if (y instanceof Combinator) {
-                    yzResult = y.apply([z]);
-                  } else if (y instanceof Expression) {
-                    yzResult = new Expression(y, [z]).evaluate();
-                  } else {
-                    yzResult = y;
-                  }
-                  log(`S-partial-x: y z = ${yzResult}`);
-
-                  log(`S-partial-x: applying xz=${xzResult} to yz=${yzResult}`);
-                  // (x z) (y z) を適用
-                  if (xzResult instanceof Combinator) {
-                    return xzResult.apply([yzResult]);
-                  } else if (xzResult instanceof Expression) {
-                    return new Expression(xzResult, [yzResult]).evaluate();
-                  } else {
-                    return xzResult;
-                  }
-                }, {
-                  name: "S-partial-xy",
-                  description: "S x y - waits for z"
-                }
-              );
-            } else if (newOperands.length >= 2) {
-              const [y, z, ...rest] = newOperands;
-
-              log(`S-partial-x: applying x=${x} to z=${z}`);
-              // x z を適用
-              let xzResult;
-              if (x instanceof Combinator) {
-                xzResult = x.apply([z]);
-              } else if (x instanceof Expression) {
-                xzResult = new Expression(x, [z]).evaluate();
-              } else {
-                xzResult = x;
-              }
-              log(`S-partial-x: x z = ${xzResult}`);
-
-              log(`S-partial-x: applying y=${y} to z=${z}`);
-              // y z を適用
-              let yzResult;
-              if (y instanceof Combinator) {
-                yzResult = y.apply([z]);
-              } else if (y instanceof Expression) {
-                yzResult = new Expression(y, [z]).evaluate();
-              } else {
-                yzResult = y;
-              }
-              log(`S-partial-x: y z = ${yzResult}`);
-
-              log(`S-partial-x: applying xz=${xzResult} to yz=${yzResult}`);
-              // (x z) (y z) を適用
-              let result;
-              if (xzResult instanceof Combinator) {
-                result = xzResult.apply([yzResult]);
-              } else if (xzResult instanceof Expression) {
-                result = new Expression(xzResult, [yzResult]).evaluate();
-              } else {
-                result = xzResult;
-              }
-
-              // 残りの引数があれば続けて適用
-              if (rest.length > 0) {
-                if (result instanceof Combinator) {
-                  return result.apply(rest);
-                } else if (result instanceof Expression) {
-                  return rest.reduce(
-                    (acc, arg) => new Expression(acc, [arg]).evaluate(),
-                    result
-                  );
-                } else {
-                  return result;
-                }
-              }
-
-              return result;
-            }
-          }, {
-            name: "S-partial-x",
-            description: "S x - waits for y and z"
-          }
-        );
-      }
-
-      // 引数なし
-      return new Combinator(
-        (newOperands) => {
-          const s = dictionaryOps.lookup("S");
-          return s.apply(newOperands);
-        }, {
-          name: "S",
-          description: "Combinator S",
-          isBuiltin: true
-        }
-      );
-    }, {
-      name: "S",
-      description: "Substitution: S x y z = x z (y z)",
-      isBuiltin: true
-    }
-  ));
+  dictionaryOps.define("ROT", () => {
+    if (state.stack.length < 3) throw new Error("ROT requires at least three items on the stack");
+    const c = stackOps.pop();
+    const b = stackOps.pop();
+    const a = stackOps.pop();
+    stackOps.push(b);
+    stackOps.push(c);
+    stackOps.push(a);
+  }, true, '上位3つの値をローテーションします (a b c -> b c a)');
 
   // 算術演算
-  dictionaryOps.define("ADD", new Combinator(
-    (operands) => {
-      log(`ADD called with operands: ${operands.map(o => o?.toString()).join(', ')}`);
-
-      if (operands.length >= 2) {
-        const a = operands[0];
-        const b = operands[1];
-
-        if (a instanceof Fraction && b instanceof Fraction) {
-          return a.add(b);
-        } else {
-          throw new Error("ADD requires two numbers");
-        }
-      } else if (operands.length === 1) {
-        const a = operands[0];
-        if (a instanceof Fraction) {
-          return new Combinator(
-            (newOperands) => {
-              if (newOperands.length === 0) return a;
-
-              const b = newOperands[0];
-              if (b instanceof Fraction) {
-                return a.add(b);
-              } else {
-                throw new Error("ADD requires two numbers");
-              }
-            }, {
-              name: "ADD-partial",
-              description: "Partially applied ADD"
-            }
-          );
-        } else {
-          throw new Error("ADD requires a number as first argument");
-        }
-      } else {
-        return new Combinator(
-          (newOperands) => {
-            const add = dictionaryOps.lookup("ADD");
-            return add.apply(newOperands);
-          }, {
-            name: "ADD",
-            description: "Addition operator",
-            isBuiltin: true
-          }
-        );
-      }
-    }, {
-      name: "ADD",
-      description: "Adds two numbers",
-      isBuiltin: true
+  dictionaryOps.define("+", () => {
+    if (state.stack.length < 2) throw new Error("+ requires two numbers on the stack");
+    const b = stackOps.pop();
+    const a = stackOps.pop();
+    
+    if (a instanceof Fraction && b instanceof Fraction) {
+      stackOps.push(a.add(b));
+    } else {
+      throw new Error("+ requires numeric arguments");
     }
-  ));
+  }, true, 'スタックの上位2つの値を加算します');
 
-  dictionaryOps.define("SUB", new Combinator(
-    (operands) => {
-      if (operands.length >= 2) {
-        const a = operands[0];
-        const b = operands[1];
-
-        if (a instanceof Fraction && b instanceof Fraction) {
-          return a.subtract(b);
-        } else {
-          throw new Error("SUB requires two numbers");
-        }
-      } else if (operands.length === 1) {
-        const a = operands[0];
-        if (a instanceof Fraction) {
-          return new Combinator(
-            (newOperands) => {
-              if (newOperands.length === 0) return a;
-
-              const b = newOperands[0];
-              if (b instanceof Fraction) {
-                return a.subtract(b);
-              } else {
-                throw new Error("SUB requires two numbers");
-              }
-            }, {
-              name: "SUB-partial",
-              description: "Partially applied SUB"
-            }
-          );
-        } else {
-          throw new Error("SUB requires a number as first argument");
-        }
-      } else {
-        return new Combinator(
-          (newOperands) => {
-            const sub = dictionaryOps.lookup("SUB");
-            return sub.apply(newOperands);
-          }, {
-            name: "SUB",
-            description: "Subtraction operator",
-            isBuiltin: true
-          }
-        );
-      }
-    }, {
-      name: "SUB",
-      description: "Subtracts second number from first",
-      isBuiltin: true
+  dictionaryOps.define("-", () => {
+    if (state.stack.length < 2) throw new Error("- requires two numbers on the stack");
+    const b = stackOps.pop();
+    const a = stackOps.pop();
+    
+    if (a instanceof Fraction && b instanceof Fraction) {
+      stackOps.push(a.subtract(b));
+    } else {
+      throw new Error("- requires numeric arguments");
     }
-  ));
+  }, true, 'スタックの上位2つの値を減算します (a b -> a-b)');
 
-  dictionaryOps.define("MUL", new Combinator(
-    (operands) => {
-      if (operands.length >= 2) {
-        const a = operands[0];
-        const b = operands[1];
-
-        if (a instanceof Fraction && b instanceof Fraction) {
-          return a.multiply(b);
-        } else {
-          throw new Error("MUL requires two numbers");
-        }
-      } else if (operands.length === 1) {
-        const a = operands[0];
-        if (a instanceof Fraction) {
-          return new Combinator(
-            (newOperands) => {
-              if (newOperands.length === 0) return a;
-
-              const b = newOperands[0];
-              if (b instanceof Fraction) {
-                return a.multiply(b);
-              } else {
-                throw new Error("MUL requires two numbers");
-              }
-            }, {
-              name: "MUL-partial",
-              description: "Partially applied MUL"
-            }
-          );
-        } else {
-          throw new Error("MUL requires a number as first argument");
-        }
-      } else {
-        return new Combinator(
-          (newOperands) => {
-            const mul = dictionaryOps.lookup("MUL");
-            return mul.apply(newOperands);
-          }, {
-            name: "MUL",
-            description: "Multiplication operator",
-            isBuiltin: true
-          }
-        );
-      }
-    }, {
-      name: "MUL",
-      description: "Multiplies two numbers",
-      isBuiltin: true
+  dictionaryOps.define("*", () => {
+    if (state.stack.length < 2) throw new Error("* requires two numbers on the stack");
+    const b = stackOps.pop();
+    const a = stackOps.pop();
+    
+    if (a instanceof Fraction && b instanceof Fraction) {
+      stackOps.push(a.multiply(b));
+    } else {
+      throw new Error("* requires numeric arguments");
     }
-  ));
+  }, true, 'スタックの上位2つの値を乗算します');
 
-  dictionaryOps.define("DIV", new Combinator(
-    (operands) => {
-      if (operands.length >= 2) {
-        const a = operands[0];
-        const b = operands[1];
-
-        if (a instanceof Fraction && b instanceof Fraction) {
-          return a.divide(b);
-        } else {
-          throw new Error("DIV requires two numbers");
-        }
-      } else if (operands.length === 1) {
-        const a = operands[0];
-        if (a instanceof Fraction) {
-          return new Combinator(
-            (newOperands) => {
-              if (newOperands.length === 0) return a;
-
-              const b = newOperands[0];
-              if (b instanceof Fraction) {
-                return a.divide(b);
-              } else {
-                throw new Error("DIV requires two numbers");
-              }
-            }, {
-              name: "DIV-partial",
-              description: "Partially applied DIV"
-            }
-          );
-        } else {
-          throw new Error("DIV requires a number as first argument");
-        }
-      } else {
-        return new Combinator(
-          (newOperands) => {
-            const div = dictionaryOps.lookup("DIV");
-            return div.apply(newOperands);
-          }, {
-            name: "DIV",
-            description: "Division operator",
-            isBuiltin: true
-          }
-        );
+  dictionaryOps.define("/", () => {
+    if (state.stack.length < 2) throw new Error("/ requires two numbers on the stack");
+    const b = stackOps.pop();
+    const a = stackOps.pop();
+    
+    if (a instanceof Fraction && b instanceof Fraction) {
+      if (b.numerator === 0) {
+        throw new Error("Division by zero");
       }
-    }, {
-      name: "DIV",
-      description: "Divides first number by second",
-      isBuiltin: true
+      stackOps.push(a.divide(b));
+    } else {
+      throw new Error("/ requires numeric arguments");
     }
-  ));
+  }, true, 'スタックの上位2つの値を除算します (a b -> a/b)');
 
-  // 比較演算
-  // 等価比較演算子 (EQ)
-  dictionaryOps.define("EQ", new Combinator(
-    (operands) => {
-      // 完全適用の場合
-      if (operands.length >= 2) {
-        const a = operands[0];
-        const b = operands[1];
-
-        // 引数を評価
-        const aVal = a instanceof Expression ? a.evaluate() :
-          (a instanceof Combinator ? a.apply([]) : a);
-        const bVal = b instanceof Expression ? b.evaluate() :
-          (b instanceof Combinator ? b.apply([]) : b);
-
-        if (!(aVal instanceof Fraction) || !(bVal instanceof Fraction)) {
-          throw new Error("EQ requires numeric arguments");
-        }
-
-        return new Fraction(aVal.equals(bVal) ? 1 : 0, 1);
-      }
-      // 部分適用の場合
-      else if (operands.length === 1) {
-        const a = operands[0];
-
-        return new Combinator(
-          (newOperands) => {
-            if (newOperands.length === 0) return a;
-
-            const b = newOperands[0];
-
-            // a と b を評価
-            const aVal = a instanceof Expression ? a.evaluate() :
-              (a instanceof Combinator ? a.apply([]) : a);
-            const bVal = b instanceof Expression ? b.evaluate() :
-              (b instanceof Combinator ? b.apply([]) : b);
-
-            if (!(aVal instanceof Fraction) || !(bVal instanceof Fraction)) {
-              throw new Error("EQ requires numeric arguments");
-            }
-
-            return new Fraction(aVal.equals(bVal) ? 1 : 0, 1);
-          }, {
-            name: "EQ-partial",
-            description: "Partially applied EQ"
-          }
-        );
-      }
-      // 引数なしの場合
-      else {
-        return new Combinator(
-          (newOperands) => {
-            const eq = dictionaryOps.lookup("EQ");
-            return eq.apply(newOperands);
-          }, {
-            name: "EQ",
-            description: "Equal comparison"
-          }
-        );
-      }
-    }, {
-      name: "EQ",
-      description: "Tests if values are equal",
-      isBuiltin: true
+  // 条件分岐
+  dictionaryOps.define("IF", () => {
+    if (state.stack.length < 3) throw new Error("IF requires three items on the stack");
+    const falseCase = stackOps.pop();
+    const trueCase = stackOps.pop();
+    const condition = stackOps.pop();
+    
+    // 条件が0でなければtrue、0ならfalse
+    if (condition instanceof Fraction && condition.numerator !== 0) {
+      stackOps.push(trueCase);
+    } else {
+      stackOps.push(falseCase);
     }
-  ));
+  }, true, '条件分岐を行います');
 
-  // 小なり比較演算子 (LT)
-  dictionaryOps.define("LT", new Combinator(
-    (operands) => {
-      // 完全適用の場合
-      if (operands.length >= 2) {
-        const a = operands[0];
-        const b = operands[1];
+  // ワード定義
+  dictionaryOps.define("DEF", () => {
+    // 実際の実装はトークン処理時に行う
+  }, true, '新しいワードを定義します');
 
-        // 引数を評価
-        const aVal = a instanceof Expression ? a.evaluate() :
-          (a instanceof Combinator ? a.apply([]) : a);
-        const bVal = b instanceof Expression ? b.evaluate() :
-          (b instanceof Combinator ? b.apply([]) : b);
+  // ワード削除
+  dictionaryOps.define("DEL", () => {
+    // 実際の実装はトークン処理時に行う
+  }, true, 'ワードを削除します');
+};
 
-        if (!(aVal instanceof Fraction) || !(bVal instanceof Fraction)) {
-          throw new Error("LT requires numeric arguments");
-        }
-
-        return new Fraction(aVal.lessThan(bVal) ? 1 : 0, 1);
-      }
-      // 部分適用の場合
-      else if (operands.length === 1) {
-        const a = operands[0];
-
-        return new Combinator(
-          (newOperands) => {
-            if (newOperands.length === 0) return a;
-
-            const b = newOperands[0];
-
-            // a と b を評価
-            const aVal = a instanceof Expression ? a.evaluate() :
-              (a instanceof Combinator ? a.apply([]) : a);
-            const bVal = b instanceof Expression ? b.evaluate() :
-              (b instanceof Combinator ? b.apply([]) : b);
-
-            if (!(aVal instanceof Fraction) || !(bVal instanceof Fraction)) {
-              throw new Error("LT requires numeric arguments");
-            }
-
-            return new Fraction(aVal.lessThan(bVal) ? 1 : 0, 1);
-          }, {
-            name: "LT-partial",
-            description: "Partially applied LT"
-          }
-        );
-      }
-      // 引数なしの場合
-      else {
-        return new Combinator(
-          (newOperands) => {
-            const lt = dictionaryOps.lookup("LT");
-            return lt.apply(newOperands);
-          }, {
-            name: "LT",
-            description: "Less than comparison"
-          }
-        );
-      }
-    }, {
-      name: "LT",
-      description: "Tests if first value is less than second",
-      isBuiltin: true
-    }
-  ));
-
-  // 大なり比較演算子 (GT)
-  dictionaryOps.define("GT", new Combinator(
-    (operands) => {
-      // 完全適用の場合
-      if (operands.length >= 2) {
-        const a = operands[0];
-        const b = operands[1];
-
-        // 引数を評価
-        const aVal = a instanceof Expression ? a.evaluate() :
-          (a instanceof Combinator ? a.apply([]) : a);
-        const bVal = b instanceof Expression ? b.evaluate() :
-          (b instanceof Combinator ? b.apply([]) : b);
-
-        if (!(aVal instanceof Fraction) || !(bVal instanceof Fraction)) {
-          throw new Error("GT requires numeric arguments");
-        }
-
-        return new Fraction(aVal.greaterThan(bVal) ? 1 : 0, 1);
-      }
-      // 部分適用の場合
-      else if (operands.length === 1) {
-        const a = operands[0];
-
-        return new Combinator(
-          (newOperands) => {
-            if (newOperands.length === 0) return a;
-
-            const b = newOperands[0];
-
-            // a と b を評価
-            const aVal = a instanceof Expression ? a.evaluate() :
-              (a instanceof Combinator ? a.apply([]) : a);
-            const bVal = b instanceof Expression ? b.evaluate() :
-              (b instanceof Combinator ? b.apply([]) : b);
-
-            if (!(aVal instanceof Fraction) || !(bVal instanceof Fraction)) {
-              throw new Error("GT requires numeric arguments");
-            }
-
-            return new Fraction(aVal.greaterThan(bVal) ? 1 : 0, 1);
-          }, {
-            name: "GT-partial",
-            description: "Partially applied GT"
-          }
-        );
-      }
-      // 引数なしの場合
-      else {
-        return new Combinator(
-          (newOperands) => {
-            const gt = dictionaryOps.lookup("GT");
-            return gt.apply(newOperands);
-          }, {
-            name: "GT",
-            description: "Greater than comparison"
-          }
-        );
-      }
-    }, {
-      name: "GT",
-      description: "Tests if first value is greater than second",
-      isBuiltin: true
-    }
-  ));
-
-  // 出力
-  dictionaryOps.define("PRINT", new Combinator(
-    (operands) => {
-      if (operands.length < 1) throw new Error("PRINT requires one argument");
-      const value = operands[0];
-
-      if (value instanceof HolonString) {
-        state.output += value.value;
-      } else {
-        state.output += value.toString();
-      }
-
-      return value;
-    }, {
-      name: "PRINT",
-      description: "Prints a value",
-      isBuiltin: true
-    }
-  ));
-
-  dictionaryOps.define("PRINTLN", new Combinator(
-    (operands) => {
-      if (operands.length < 1) throw new Error("PRINTLN requires one argument");
-      const value = operands[0];
-
-      if (value instanceof HolonString) {
-        state.output += value.value + "\n";
-      } else {
-        state.output += value.toString() + "\n";
-      }
-
-      return value;
-    }, {
-      name: "PRINTLN",
-      description: "Prints a value followed by a newline",
-      isBuiltin: true
-    }
-  ));
-
-  // 条件分岐用のコンビネータ TRUE, FALSE
-  dictionaryOps.define("TRUE", new Combinator(
-    (operands) => {
-      if (operands.length < 2) throw new Error("TRUE requires two arguments");
-      return operands[0];
-    }, {
-      name: "TRUE",
-      description: "TRUE x y = x",
-      isBuiltin: true
-    }
-  ));
-
-  dictionaryOps.define("FALSE", new Combinator(
-    (operands) => {
-      if (operands.length < 2) throw new Error("FALSE requires two arguments");
-      return operands[1];
-    }, {
-      name: "FALSE",
-      description: "FALSE x y = y",
-      isBuiltin: true
-    }
-  ));
-
-  // 条件分岐 (IF cond then else)
-  dictionaryOps.define("IF", new Combinator(
-    (operands) => {
-      if (operands.length < 3) throw new Error("IF requires three arguments");
-      const condition = operands[0];
-
-      // 条件が Fraction で 0 以外なら真
-      if (condition instanceof Fraction && condition.numerator !== 0) {
-        return operands[1];
-      } else {
-        return operands[2];
-      }
-    }, {
-      name: "IF",
-      description: "Conditional: IF cond then else",
-      isBuiltin: true
-    }
-  ));
-
-  // Y コンビネータ（再帰用）: Y f = f (Y f)
-  dictionaryOps.define("Y", new Combinator(
-    (operands) => {
-      if (operands.length < 1) throw new Error("Y requires one argument");
-      const f = operands[0];
-
-      // 再帰呼び出しを可能にするための特殊処理
-      const recursion = new Combinator(
-        (innerOperands) => {
-          const yf = new Expression(f, [recursion]);
-          return yf.evaluate();
-        }, {
-          name: "Y-recursion",
-          description: "Recursion helper"
-        }
-      );
-
-      return recursion;
-    }, {
-      name: "Y",
-      description: "Y-combinator for recursion: Y f = f (Y f)",
-      isBuiltin: true
-    }
-  ));
-
-  // DEF（定義）コンビネータ
-  dictionaryOps.define("DEF", new Combinator(
-    (operands) => {
-      if (operands.length < 2) throw new Error("DEF requires a name and a value");
-      const name = operands[0];
-      const value = operands[1];
-      
-      // 名前として文字列か識別子を受け入れる
-      let wordName;
-      if (name instanceof HolonString) {
-        wordName = name.value;
-      } else if (typeof name === 'string') {
-        wordName = name;
-      } else {
-        wordName = name.toString();
-      }
-      
-      return dictionaryOps.define(wordName, value);
-    }, {
-      name: "DEF",
-      description: "Defines a new word: DEF name value",
-      isBuiltin: true
-    }
-  ));
-
-  // DEL（削除）コンビネータ
-  dictionaryOps.define("DEL", new Combinator(
-    (operands) => {
-      if (operands.length < 1) throw new Error("DEL requires a name");
-      const name = operands[0];
-      
-      // 名前として文字列か識別子を受け入れる
-      let wordName;
-      if (name instanceof HolonString) {
-        wordName = name.value;
-      } else if (typeof name === 'string') {
-        wordName = name;
-      } else {
-        wordName = name.toString();
-      }
-      
-      return dictionaryOps.remove(wordName) ? 
-        new Fraction(1, 1) : 
-        new Fraction(0, 1);
-    }, {
-      name: "DEL",
-      description: "Deletes a word: DEL name",
-      isBuiltin: true
-    }
-  ));
-
-  // シンボル演算子 - 四則演算
-  dictionaryOps.define("+", dictionaryOps.lookup("ADD"));
-  dictionaryOps.define("-", dictionaryOps.lookup("SUB"));
-  dictionaryOps.define("*", dictionaryOps.lookup("MUL"));
-  dictionaryOps.define("/", dictionaryOps.lookup("DIV"));
-  
-  // シンボル演算子 - 比較
-  dictionaryOps.define("==", dictionaryOps.lookup("EQ"));
-  dictionaryOps.define("<", dictionaryOps.lookup("LT"));
-  dictionaryOps.define(">", dictionaryOps.lookup("GT"));
+// 文字入力マッピング（スワイプ時に使用）
+const charMap = {
+  '1': {'0': 'A', '45': 'B', '90': 'C', '135': 'D', '180': 'E', '-135': 'F', '-90': 'G', '-45': 'H'},
+  '2': {'0': 'I', '45': 'J', '90': 'K', '135': 'L', '180': 'M', '-135': 'N', '-90': 'O', '-45': 'P'},
+  '3': {'0': 'Q', '45': 'R', '90': 'S', '135': 'T', '180': 'U', '-135': 'V', '-90': 'W', '-45': 'X'},
+  '4': {'0': 'Y', '45': 'Z', '90': '.', '135': ',', '180': ';', '-135': ':', '-90': '(', '-45': ')'},
+  '5': {'0': '+', '45': '-', '90': '*', '135': '/', '180': '=', '-135': '<', '-90': '>', '-45': '!'},
+  '6': {'0': '{', '45': '}', '90': '[', '135': ']', '180': '|', '-135': '\\', '-90': '/', '-45': '?'},
+  '7': {'0': '~', '45': '`', '90': '@', '135': '#', '180': '$', '-135': '%', '-90': '^', '-45': '&'},
+  '8': {'0': '_', '45': '"', '90': '\'', '135': ' ', '180': '\n', '-135': '\t', '-90': '0', '-45': '1'},
+  '9': {'0': '2', '45': '3', '90': '4', '135': '5', '180': '6', '-135': '7', '-90': '8', '-45': '9'},
 };
 
 // UI要素の取得
 const elements = {
-  output: document.querySelector('.output-box p'),
-  input: document.querySelector('textarea'),
-  builtinWords: document.querySelector('.builtin-words-area'),
-  customWords: document.querySelector('.custom-words-area')
+  output: null,
+  input: null,
+  stack: null,
+  registers: null,
+  builtinWords: null,
+  customWords: null
+};
+
+// 組み込みワードエリアのカンバスボタンを描画する関数
+const drawWordButtons = () => {
+  console.log("Drawing word buttons...");
+  const container = elements.builtinWords;
+  if (!container) {
+    console.error("Built-in words container not found!");
+    return;
+  }
+  
+  container.innerHTML = '<h3 title="XXX">Built-In Words</h3>';
+  
+  // 組み込みワードとして登録された数字とワードのマッピングを使用
+  const wordDigitMap = state.wordDigitMap || {};
+  console.log("Word-digit map:", wordDigitMap);
+  
+  if (Object.keys(wordDigitMap).length === 0) {
+    console.warn("No word-digit mappings found!");
+    // マッピングがなければデフォルト値を使用
+    Object.assign(wordDigitMap, {
+      '1': 'DUP', '2': 'DROP', '3': 'SWAP',
+      '4': 'OVER', '5': 'ROT', '6': '+',
+      '7': '-', '8': '*', '9': '/',
+      '*': 'DEF', '0': 'IF', '#': 'DEL'
+    });
+  }
+  
+  // カンバスボタンを格納するグループdivを作成
+  const groupDiv = document.createElement('div');
+  groupDiv.className = 'word-group canvas-buttons';
+  
+  // 数字ボタンを作成（ポケベルの数字キーパッドレイアウト）
+  const layout = [
+    ['1', '2', '3'],
+    ['4', '5', '6'],
+    ['7', '8', '9'],
+    ['*', '0', '#']
+  ];
+  
+  layout.forEach(row => {
+    row.forEach(digit => {
+      const word = wordDigitMap[digit] || '';
+      
+      // カンバス要素を作成
+      const canvas = document.createElement('canvas');
+      canvas.width = 80;
+      canvas.height = 80;
+      canvas.className = 'word-button';
+      canvas.dataset.digit = digit;
+      canvas.dataset.word = word;
+      
+      // ポケベル信号のボタンを描画
+      drawPagerButton(canvas, digit, word);
+      
+      // イベントリスナーを設定
+      setupButtonListeners(canvas);
+      
+      groupDiv.appendChild(canvas);
+    });
+  });
+  
+  container.appendChild(groupDiv);
+  console.log("Word buttons drawn:", groupDiv.children.length);
+};
+
+// ポケベルボタンを描画する関数
+const drawPagerButton = (canvas, digit, word) => {
+  if (!canvas) {
+    console.error("Canvas is null or undefined!");
+    return;
+  }
+  
+  console.log(`Drawing pager button: ${digit} - ${word}`);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    console.error("Could not get canvas context!");
+    return;
+  }
+  
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // 背景をクリア
+  ctx.clearRect(0, 0, width, height);
+  
+  // 円を描画
+  ctx.beginPath();
+  ctx.arc(width/2, height/2, width/2 - 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+  ctx.strokeStyle = '#dddddd';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  
+  // 数字を描画
+  ctx.font = 'bold 24px sans-serif';
+  ctx.fillStyle = '#333333';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(digit, width/2, height/2 - 5);
+  
+  // ワード名を描画
+  ctx.font = '12px sans-serif';
+  ctx.fillText(word, width/2, height/2 + 15);
+};
+
+// ボタンのイベントリスナーを設定
+const setupButtonListeners = (canvas) => {
+  const digit = canvas.dataset.digit;
+  const word = canvas.dataset.word;
+  
+  let longPressTimer;
+  let touchStartX, touchStartY;
+  let isSwiping = false;
+  
+  // クリック（タップ）イベント - 数字を入力
+  canvas.addEventListener('click', (e) => {
+    // 長押しまたはスワイプ中は処理しない
+    if (longPressTimer || isSwiping) return;
+    
+    // ポケベル信号を再生
+    playPagerTone(digit);
+    
+    // 数字を入力エリアに挿入
+    insertAtCursor(digit);
+  });
+  
+  // マウスダウン/タッチスタート - 長押し検出開始
+  const startHandler = (e) => {
+    // タッチイベントの場合は座標を記録
+    if (e.type === 'touchstart') {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }
+    
+    // 長押し検出用タイマーを設定
+    longPressTimer = setTimeout(() => {
+      // ポケベル信号を再生
+      playPagerTone(digit);
+      
+      // ワードを入力エリアに挿入
+      insertAtCursor(word + ' ');
+      
+      // ボタンの見た目を一時的に変更
+      canvas.classList.add('pressed');
+      setTimeout(() => {
+        canvas.classList.remove('pressed');
+      }, 200);
+      
+      longPressTimer = null;
+    }, 500); // 500ms以上の長押しで発動
+  };
+  
+  // マウスアップ/タッチエンド - タイマークリア
+  const endHandler = () => {
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+    isSwiping = false;
+  };
+  
+  // タッチムーブ - スワイプ検出
+  const moveHandler = (e) => {
+    if (!e.touches || isSwiping || !longPressTimer) return;
+    
+    const touchX = e.touches[0].clientX;
+    const touchY = e.touches[0].clientY;
+    
+    // スワイプの距離を計算
+    const distX = touchX - touchStartX;
+    const distY = touchY - touchStartY;
+    const distance = Math.sqrt(distX * distX + distY * distY);
+    
+    // スワイプ検出（一定距離以上移動した場合）
+    if (distance > 20) {
+      // タイマーをクリア
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+      isSwiping = true;
+      
+      // スワイプの角度を計算
+      const angle = Math.atan2(distY, distX) * 180 / Math.PI;
+      
+      // 8方向に量子化
+      const directions = [0, 45, 90, 135, 180, -135, -90, -45];
+      const closestDirection = directions.reduce((prev, curr) => 
+        Math.abs(curr - angle) < Math.abs(prev - angle) ? curr : prev
+      );
+      
+      // 対応する文字を取得
+      const map = charMap[digit] || {};
+      const char = map[closestDirection] || '';
+      
+      if (char) {
+        // ポケベル信号を再生
+        playPagerTone(digit);
+        
+        // 文字を入力エリアに挿入
+        insertAtCursor(char);
+      }
+    }
+  };
+  
+  // イベントリスナーを登録
+  canvas.addEventListener('mousedown', startHandler);
+  canvas.addEventListener('touchstart', startHandler);
+  
+  canvas.addEventListener('mouseup', endHandler);
+  canvas.addEventListener('touchend', endHandler);
+  canvas.addEventListener('touchcancel', endHandler);
+  
+  canvas.addEventListener('touchmove', moveHandler);
+};
+
+// カーソル位置にテキストを挿入する関数
+const insertAtCursor = (text) => {
+  const textarea = elements.input;
+  const cursorPos = textarea.selectionStart;
+  const textBefore = textarea.value.substring(0, cursorPos);
+  const textAfter = textarea.value.substring(cursorPos);
+  
+  textarea.value = textBefore + text + textAfter;
+  textarea.selectionStart = textarea.selectionEnd = cursorPos + text.length;
+  textarea.focus();
+};
+
+// メモリ表示領域の初期化
+const initializeMemoryDisplays = () => {
+  // スタック表示領域の初期化
+  const stackArea = document.querySelector('.stack-area');
+  if (!stackArea.querySelector('.stack-display')) {
+    const stackDisplay = document.createElement('div');
+    stackDisplay.className = 'stack-display';
+    stackArea.appendChild(stackDisplay);
+  }
+  
+  // レジスタ表示領域の初期化
+  const registerArea = document.querySelector('.register-area');
+  if (!registerArea.querySelector('.register-display')) {
+    const registerDisplay = document.createElement('div');
+    registerDisplay.className = 'register-display';
+    registerArea.appendChild(registerDisplay);
+  }
 };
 
 // UI更新関数
+// UI更新関数の続き
 const updateUI = () => {
-  // 出力エリア更新 - p タグを使わずに直接設定
-  const outputBox = document.querySelector('.output-box');
-  outputBox.textContent = state.output;  // innerHTML ではなく textContent を使用
-
+  // 出力エリア更新
+  elements.output.textContent = state.output;
+  
+  // スタックエリア更新
+  updateStackDisplay();
+  
+  // レジスタエリア更新
+  updateRegisterDisplay();
+  
   // 辞書ワード表示更新
-  renderDictionary();
+  updateWordDisplay();
 };
 
-// 辞書ワードボタンの生成
-const renderDictionary = () => {
-  // 組み込みワード表示
-  elements.builtinWords.innerHTML = '<h3>Built-In Words</h3>';
-
-  // 組み込みワードのグループ分け
-  const builtinGroups = {
-    // コンビネータ
-    combinators: ["I", "K", "S", "Y"],
-    // 四則演算
-    arithmetic: ["+", "-", "*", "/"],
-    // 比較演算
-    comparison: ["==", "<", ">"],
-    // 論理演算
-    logic: ["TRUE", "FALSE", "IF"],
-    // ワード定義操作
-    wordOps: ["DEF", "DEL"],
-    // 出力
-    output: ["PRINT", "PRINTLN"]
-  };
-
-  // 各グループごとにボタンを生成
-  Object.entries(builtinGroups).forEach(([groupName, words]) => {
-    const groupDiv = document.createElement("div");
-    groupDiv.className = "word-group";
-
-    words.forEach(word => {
-      // 辞書に登録されているワードのみ表示
-      if (dictionaryOps.lookup(word)) {
-        const wordInfo = state.dictionary[word];
-        const meta = wordInfo.meta || {};
-
-        const wordButton = document.createElement("button");
-        wordButton.textContent = word;
-        wordButton.title = meta.description || "";
-        wordButton.className = "word-button";
-
-        // クリックイベント - 空白を追加しない
-        wordButton.addEventListener("click", () => {
-          const cursorPos = elements.input.selectionStart;
-          const textBefore = elements.input.value.substring(0, cursorPos);
-          const textAfter = elements.input.value.substring(cursorPos);
-          elements.input.value = textBefore + word + textAfter;
-
-          // カーソル位置を更新
-          elements.input.selectionStart = elements.input.selectionEnd = cursorPos + word.length;
-          elements.input.focus();
-        });
-
-        groupDiv.appendChild(wordButton);
-      }
+// スタック表示を更新
+const updateStackDisplay = () => {
+  const stackArea = document.querySelector('.stack-area');
+  stackArea.innerHTML = '<h3 title="XXX">Stack</h3>';
+  
+  // スタック表示エリアを作成
+  const stackDisplay = document.createElement('div');
+  stackDisplay.className = 'stack-display';
+  
+  // スタックの内容を表示
+  if (state.stack.length === 0) {
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'empty-message';
+    emptyMessage.textContent = 'Stack is empty';
+    stackDisplay.appendChild(emptyMessage);
+  } else {
+    // 逆順に表示（最上位が一番下）
+    [...state.stack].reverse().forEach((item, index) => {
+      const stackItem = document.createElement('div');
+      stackItem.className = 'stack-item';
+      
+      // インデックス（深さ）を表示
+      const depth = state.stack.length - index - 1;
+      stackItem.textContent = `${depth}: ${item.toString()}`;
+      
+      stackDisplay.appendChild(stackItem);
     });
+  }
+  
+  stackArea.appendChild(stackDisplay);
+};
 
-    // グループに少なくとも1つのボタンがある場合のみ追加
-    if (groupDiv.children.length > 0) {
-      elements.builtinWords.appendChild(groupDiv);
-    }
-  });
+// レジスタ表示を更新
+const updateRegisterDisplay = () => {
+  const registerArea = document.querySelector('.register-area');
+  registerArea.innerHTML = '<h3 title="XXX">Registers</h3>';
+  
+  // レジスタ表示エリアを作成
+  const registerDisplay = document.createElement('div');
+  registerDisplay.className = 'register-display';
+  
+  // レジスタの内容を表示
+  const registers = registerOps.getAll();
+  const keys = Object.keys(registers);
+  
+  if (keys.length === 0) {
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'empty-message';
+    emptyMessage.textContent = 'No registers defined';
+    registerDisplay.appendChild(emptyMessage);
+  } else {
+    keys.forEach(key => {
+      const registerItem = document.createElement('div');
+      registerItem.className = 'register-item';
+      registerItem.textContent = `${key}: ${registers[key].toString()}`;
+      registerDisplay.appendChild(registerItem);
+    });
+  }
+  
+  registerArea.appendChild(registerDisplay);
+};
 
-  // カスタムワード表示
-  elements.customWords.innerHTML = '<h3>Custom Words</h3>';
+// ワード表示を更新
+const updateWordDisplay = () => {
+  // 組み込みワード（ポケベルボタン）を描画
+  drawWordButtons();
+  
+  // カスタムワード表示を更新
+  updateCustomWordsDisplay();
+};
 
-  // カスタムワードを取得
-  const customWords = Object.entries(state.dictionary)
-    .filter(([_, value]) => value instanceof Expression || (value instanceof Combinator && !value.meta.isBuiltin))
-    .map(([name]) => name)
-    .sort();
-
+// カスタムワード表示を更新
+const updateCustomWordsDisplay = () => {
+  const customWordsArea = elements.customWords;
+  customWordsArea.innerHTML = '<h3 title="XXX">Custom Words</h3>';
+  
+  // カスタムワードのリストを取得
+  const customWords = dictionaryOps.listCustomWords().sort();
+  
+  if (customWords.length === 0) {
+    const emptyMessage = document.createElement('div');
+    emptyMessage.className = 'empty-message';
+    emptyMessage.textContent = 'No custom words defined';
+    customWordsArea.appendChild(emptyMessage);
+    return;
+  }
+  
+  // ワードグループを作成
+  const wordGroup = document.createElement('div');
+  wordGroup.className = 'word-group';
+  
+  // 各カスタムワードのボタンを作成
   customWords.forEach(word => {
-    const wordInfo = state.dictionary[word];
-
-    const wordButton = document.createElement("button");
+    const wordButton = document.createElement('button');
+    wordButton.className = 'word-button custom-word';
     wordButton.textContent = word;
-    wordButton.title = wordInfo.toString();
-    wordButton.className = "word-button";
-
-    // クリックイベント - 空白を追加しない
-    wordButton.addEventListener("click", () => {
-      const cursorPos = elements.input.selectionStart;
-      const textBefore = elements.input.value.substring(0, cursorPos);
-      const textAfter = elements.input.value.substring(cursorPos);
-      elements.input.value = textBefore + word + textAfter;
-
-      // カーソル位置を更新
-      elements.input.selectionStart = elements.input.selectionEnd = cursorPos + word.length;
-      elements.input.focus();
+    wordButton.title = 'Click to insert this word';
+    
+    // クリックイベント - ワードを入力エリアに挿入
+    wordButton.addEventListener('click', () => {
+      insertAtCursor(word + ' ');
     });
-
-    elements.customWords.appendChild(wordButton);
+    
+    wordGroup.appendChild(wordButton);
   });
+  
+  customWordsArea.appendChild(wordGroup);
 };
 
 // トークン分割
@@ -1210,12 +857,26 @@ const tokenize = code => {
   let currentToken = '';
   let inString = false;
   let inComment = false;
+  let inDefinition = false;
+  let definitionBody = '';
 
   while (i < code.length) {
     const char = code[i];
 
+    // DEF ワード定義の特別処理
+    if (inDefinition) {
+      if (char === '}') {
+        // 定義本体の終了
+        tokens.push(definitionBody.trim());
+        inDefinition = false;
+        definitionBody = '';
+      } else {
+        // 定義本体を収集
+        definitionBody += char;
+      }
+    }
     // コメント処理
-    if (char === '#' && !inString) {
+    else if (char === '#' && !inString) {
       inComment = true;
       if (currentToken.length > 0) {
         tokens.push(currentToken);
@@ -1225,8 +886,9 @@ const tokenize = code => {
       if (char === '\n') {
         inComment = false;
       }
-    } else if (char === '"') {
-      // 文字列リテラルの処理
+    }
+    // 文字列リテラル処理
+    else if (char === '"') {
       if (inString) {
         currentToken += char;
         tokens.push(currentToken);
@@ -1242,17 +904,19 @@ const tokenize = code => {
       }
     } else if (inString) {
       currentToken += char;
-    } else if (/\s/.test(char)) {
+    }
+    // DEF定義の開始
+    else if (currentToken.toUpperCase() === 'DEF' && char === '{') {
+      inDefinition = true;
+      tokens.push(currentToken);
+      currentToken = '';
+    }
+    // 空白処理
+    else if (/\s/.test(char)) {
       if (currentToken.length > 0) {
         tokens.push(currentToken);
         currentToken = '';
       }
-    } else if ("()".includes(char)) {
-      if (currentToken.length > 0) {
-        tokens.push(currentToken);
-        currentToken = '';
-      }
-      tokens.push(char);
     } else {
       currentToken += char;
     }
@@ -1268,228 +932,103 @@ const tokenize = code => {
   return tokens;
 };
 
-// 式の解析
-// パーサーの修正版（既存のコードと置き換えてください）
-// 式の解析
-const parseExpression = (tokens, startIndex) => {
-  // 現在のトークンがリテラルまたは名前の場合
-  if (tokens[startIndex] !== '(') {
-    const token = tokens[startIndex];
-
-    // 数値リテラル
-    if (/^-?\d+(\.\d+)?$/.test(token)) {
-      return {
-        expr: new Fraction(parseInt(token, 10), 1),
-        endIndex: startIndex
-      };
-    }
-
-    // 分数リテラル
-    if (token.includes('/')) {
-      const [num, denom] = token.split('/');
-      return {
-        expr: new Fraction(parseInt(num, 10), parseInt(denom, 10)),
-        endIndex: startIndex
-      };
-    }
-
-    // 文字列リテラル
-    if (token.startsWith('"') && token.endsWith('"')) {
-      return {
-        expr: new HolonString(token.slice(1, -1)),
-        endIndex: startIndex
-      };
-    }
-
-    // 名前（辞書ワード）
-    const word = dictionaryOps.lookup(normalizeToken(token));
-    if (word !== null) {
-      return {
-        expr: word,
-        endIndex: startIndex
-      };
-    }
-
-    throw new Error(`Unknown token: ${token}`);
-  }
-
-  // 括弧で始まる式の処理
-  let i = startIndex + 1;
-  if (i >= tokens.length) {
-    throw new Error("Unexpected end of input");
-  }
-
-  // オペレータを解析
-  const {
-    expr: operator,
-    endIndex: operatorEndIndex
-  } = parseExpression(tokens, i);
-
-  // オペランドを収集
-  const operands = [];
-  i = operatorEndIndex + 1;
-
-  while (i < tokens.length && tokens[i] !== ')') {
-    const {
-      expr: operand,
-      endIndex: operandEndIndex
-    } = parseExpression(tokens, i);
-    operands.push(operand);
-    i = operandEndIndex + 1;
-  }
-
-  if (i >= tokens.length || tokens[i] !== ')') {
-    throw new Error("Unclosed expression");
-  }
-
-  return {
-    expr: new Expression(operator, operands),
-    endIndex: i
-  };
-};
-
-// パーサー
-const parse = tokens => {
-  log(`Parsing ${tokens.length} tokens: ${tokens.join(' ')}`);
+// 式の評価
+const evaluate = tokens => {
+  log(`Evaluating ${tokens.length} tokens: ${tokens.join(' ')}`);
 
   try {
-    // DEF の処理
+    // DEF処理 (例: DEF NAME { code... } #comment)
     if (tokens.length >= 3 && normalizeToken(tokens[0]) === "DEF") {
       const name = tokens[1];
+      const body = tokens[2]; // 本体コードは既にtokenizeで抽出済み
       
-      // 残りのトークンから式を解析
-      const defTokens = tokens.slice(2);
-      let defExpr;
-      
-      // 括弧があるかチェック
-      if (defTokens[0] === '(' && defTokens[defTokens.length - 1] === ')') {
-        // 括弧付きの式を解析
-        const { expr } = parseExpression(defTokens, 0);
-        defExpr = expr;
-      } else {
-        // 単一トークンの場合
-        defExpr = parse(defTokens);
-      }
-      
-      // 辞書に定義
-      dictionaryOps.define(name, defExpr);
-      return new Fraction(1, 1); // 成功を示す値
+      // カスタムワードを辞書に定義
+      dictionaryOps.define(name, body, false, 'Custom word');
+      state.output += `Defined: ${name}\n`;
+      updateUI();
+      return true;
     }
     
-    // DEL の処理
+    // DEL処理
     if (tokens.length >= 2 && normalizeToken(tokens[0]) === "DEL") {
       const name = tokens[1];
       const success = dictionaryOps.remove(name);
-      return new Fraction(success ? 1 : 0, 1);
+      
+      if (success) {
+        state.output += `Removed: ${name}\n`;
+      } else {
+        state.output += `Word not found or cannot be removed: ${name}\n`;
+      }
+      
+      updateUI();
+      return true;
     }
 
-    // 単一のワード実行
-    if (tokens.length === 1) {
-      const token = tokens[0];
-
-      // 数値や文字列を評価
+    // 各トークンを評価
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      
+      // 数値リテラル
       if (/^-?\d+(\.\d+)?$/.test(token)) {
-        return new Fraction(parseInt(token, 10), 1);
+        // 整数
+        stackOps.push(new Fraction(parseInt(token, 10), 1));
+        continue;
       }
-
+      
+      // 分数リテラル
       if (token.includes('/')) {
         const [num, denom] = token.split('/');
-        return new Fraction(parseInt(num, 10), parseInt(denom, 10));
+        stackOps.push(new Fraction(parseInt(num, 10), parseInt(denom, 10)));
+        continue;
       }
-
+      
+      // 文字列リテラル
       if (token.startsWith('"') && token.endsWith('"')) {
-        return new HolonString(token.slice(1, -1));
+        stackOps.push(new HolonString(token.slice(1, -1)));
+        continue;
       }
-
+      
       // 辞書ワード
       const word = dictionaryOps.lookup(normalizeToken(token));
       if (word !== null) {
-        return word;
-      }
-
-      throw new Error(`Unknown word: ${token}`);
-    }
-
-    // 複数のワード（関数適用）
-    if (tokens.length >= 2) {
-      // 最初のトークンが辞書ワードで、他のトークンが引数の場合
-      const func = dictionaryOps.lookup(normalizeToken(tokens[0]));
-
-      if (func !== null) {
-        // 残りのトークンを引数として評価
-        const args = [];
-        for (let i = 1; i < tokens.length; i++) {
-          // 括弧があればそれを式として解析
-          if (tokens[i] === '(') {
-            // 対応する閉じ括弧を見つける
-            let bracketCount = 1;
-            let j = i + 1;
-            
-            while (j < tokens.length && bracketCount > 0) {
-              if (tokens[j] === '(') bracketCount++;
-              if (tokens[j] === ')') bracketCount--;
-              j++;
-            }
-            
-            if (bracketCount !== 0) {
-              throw new Error("Unmatched brackets");
-            }
-            
-            // 括弧内の式を解析
-            const subTokens = tokens.slice(i, j);
-            const arg = parse(subTokens);
-            args.push(arg);
-            i = j - 1; // iは次のループでインクリメントされる
-          } else {
-            const arg = parse([tokens[i]]);
-            args.push(arg);
-          }
-        }
-
-        // 関数を適用
-        if (func instanceof Combinator) {
-          return func.apply(args);
-        } else if (func instanceof Expression) {
-          // 引数ごとに式に適用
-          let result = func;
-          for (const arg of args) {
-            result = new Expression(result, [arg]).evaluate();
-          }
-          return result;
+        // カスタムワードの場合
+        if (typeof word === 'string') {
+          // カスタムワードの本体を再帰的に評価
+          const customTokens = tokenize(word);
+          evaluate(customTokens);
+        } 
+        // 組み込みワード（関数）の場合
+        else if (typeof word === 'function') {
+          // 関数を実行
+          word();
         } else {
-          return func; // 関数でない場合はそのまま返す
+          throw new Error(`Unknown word type: ${token}`);
         }
+        continue;
       }
+      
+      // 未知のトークン
+      throw new Error(`Unknown token: ${token}`);
     }
-
-    // 括弧で囲まれた式
-    if (tokens[0] === '(' && tokens[tokens.length - 1] === ')') {
-      const { expr } = parseExpression(tokens, 0);
-      return expr;
-    }
-
-    // それ以外の場合は式として解析
-    try {
-      const { expr } = parseExpression(['(', ...tokens, ')'], 0);
-      return expr;
-    } catch (e) {
-      throw new Error(`Failed to parse expression: ${e.message}`);
-    }
+    
+    return true;
   } catch (error) {
-    log(`Parse error: ${error.message}`);
-    throw error;
+    log(`Evaluation error: ${error.message}`);
+    state.output += `Error: ${error.message}\n`;
+    updateUI();
+    return false;
   }
 };
 
-// 実行関数// 実行関数 - ウェルカムメッセージを初回実行時にクリアする機能を追加
+// 実行関数
 const executeCode = code => {
   log(`==== Execution started ====`);
   try {
     log(`Input code: ${code}`);
     
     // ウェルカムメッセージかどうかを確認するフラグ
-    const isFirstExecution = state.output.includes("Holon Combinatory Logic") && 
-                            state.output.includes("Example: DEF ADDER");
+    const isFirstExecution = state.output.includes("Holon FORTH-Based") && 
+                            state.output.includes("Example: 2 3 +");
     
     // ウェルカムメッセージの場合はクリア
     if (isFirstExecution) {
@@ -1497,57 +1036,17 @@ const executeCode = code => {
     }
     
     const tokens = tokenize(code);
-
-    // DEFやDELコマンドか確認
-    const isDefinition = tokens.length >= 2 && normalizeToken(tokens[0]) === "DEF";
-    const isDeletion = tokens.length >= 2 && normalizeToken(tokens[0]) === "DEL";
-
-    // 通常の式を評価
-    const result = parse(tokens);
-    log(`Parsed expression result: ${result}`);
-
-    // DEFやDELコマンドの場合は特別な出力処理
-    if (isDefinition) {
-      state.output += `Defined: ${tokens[1]}\n`;
-      updateUI();
-      elements.input.value = "";
-      log(`Definition successful: ${tokens[1]}`);
-    } else if (isDeletion) {
-      if (result instanceof Fraction && result.numerator === 1) {
-        state.output += `Removed: ${tokens[1]}\n`;
-      } else {
-        state.output += `Word not found: ${tokens[1]}\n`;
-      }
-      updateUI();
-      elements.input.value = "";
-      log(`Delete command executed for: ${tokens[1]}`);
-    } else {
-      // 通常の式の場合、最終結果を評価して出力
-      let finalResult;
-      if (result instanceof Expression) {
-        finalResult = result.evaluate();
-      } else if (result instanceof Combinator) {
-        // コンビネータは引数がないとそのまま返す
-        finalResult = result;
-      } else {
-        finalResult = result;
-      }
-
-      log(`Final result: ${finalResult}`);
-
-      // 結果を出力
-      if (state.output.length > 0 && !state.output.endsWith('\n')) {
-        state.output += '\n';
-      }
-      state.output += finalResult.toString();
-
-      updateUI();
-      elements.input.value = "";
-      log(`Execution successful`);
-    }
+    
+    // トークンを評価
+    evaluate(tokens);
+    
+    // UI更新
+    updateUI();
+    elements.input.value = "";
+    log(`Execution successful`);
   } catch (error) {
     // エラー時もウェルカムメッセージをクリア
-    if (state.output.includes("Holon Combinatory Logic")) {
+    if (state.output.includes("Holon FORTH-Based")) {
       state.output = "";
     }
     
@@ -1574,11 +1073,110 @@ const initEventListeners = () => {
   });
 };
 
+// HTML用のスタイル修正
+const addCSSStyles = () => {
+  // 既存のスタイルに追加するスタイル
+  const additionalStyles = `
+    .stack-display, .register-display {
+      background: linear-gradient(-45deg, var(--background-dark), var(--background-light));
+      padding: 10px;
+      margin-bottom: 10px;
+      font-family: var(--font-monospace);
+      border: 1px solid var(--border-color);
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .stack-display {
+      height: 150px;
+      overflow-y: auto;
+    }
+    
+    .register-display {
+      min-height: 60px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 5px;
+    }
+    
+    .stack-item, .register-item {
+      padding: 5px;
+      margin-bottom: 5px;
+      background: rgba(255, 255, 255, 0.5);
+      border-radius: 3px;
+    }
+    
+    .stack-item {
+      border-left: 3px solid #888;
+    }
+    
+    .register-item {
+      text-align: center;
+    }
+    
+    .empty-message {
+      color: var(--text-color-gray);
+      text-align: center;
+      font-style: italic;
+      padding: 10px;
+    }
+    
+    .canvas-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      width: 100%;
+    }
+    
+    .word-button {
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    canvas.word-button {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1/1;
+      border-radius: 50%;
+      background: white;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    }
+    
+    .word-button.pressed {
+      transform: scale(0.95);
+      box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+    }
+    
+    @media (max-width: 768px) {
+      .canvas-buttons {
+        gap: 15px;
+      }
+    }
+  `;
+  
+  // スタイルタグを作成して追加
+  const styleElement = document.createElement('style');
+  styleElement.textContent = additionalStyles;
+  document.head.appendChild(styleElement);
+};
+
 // 初期化
 const init = () => {
-  log(`Initializing Holon with combinatory logic`);
+  log(`Initializing Holon with FORTH-based stack logic`);
 
-  // 組み込みコンビネータの初期化
+  // UI要素の取得
+  elements.output = document.querySelector('.output-box');
+  elements.input = document.querySelector('textarea');
+  elements.builtinWords = document.querySelector('.builtin-words-area');
+  elements.customWords = document.querySelector('.custom-words-area');
+  
+  // スタックとレジスタ表示領域の初期化
+  initializeMemoryDisplays();
+  
+  // スタイルシートのチェックと修正
+  addCSSStyles();
+
+  // 組み込みワードの初期化
   initializeBuiltins();
 
   // イベントリスナーの設定
@@ -1588,10 +1186,14 @@ const init = () => {
   updateUI();
 
   // ウェルカムメッセージ
-  state.output = "Holon Combinatory Logic\n" +
-    "Example: DEF ADDER (S (K +) I)\n" +
-    "         ADDER 3 5\n";
+  state.output = "Holon FORTH-Based Stack Language\n" +
+    "Example: 2 3 + PRINTLN\n" +
+    "Define custom word: DEF DOUBLE { DUP + }\n";
   updateUI();
+  
+  // 問題のデバッグ用
+  console.log("Built-in words area:", elements.builtinWords);
+  console.log("Word-digit map:", state.wordDigitMap);
 };
 
 // アプリケーション起動

@@ -15,11 +15,12 @@
         <img src="image/logo.png" alt="Holon Logo" class="logo">
       </a>
       <h1>Holon
-        <span>Ver.202504061942</span>
+        <span>Ver.202504072158</span>
       </h1>
     </div>
   </header>
   <article class="container">
+    <!-- I/Oセクション（変更なし） -->
     <section class="io-section">
       <h2 title="XXX">I/O</h2>
       <div class="output-area">
@@ -29,40 +30,37 @@
         </div>
       </div>
       <div class="input-area">
-  <h3 title="XXX">Input</h3>
-  <div class="input-container">
-    <textarea placeholder="Type code and press Shift+Enter to execute"></textarea>
-    <div class="dot-area">
-      <div class="buffer-display">
-        <div class="buffer-content" placeholder="buffer"></div>
+        <h3 title="XXX">Input</h3>
+        <div class="input-container">
+          <textarea placeholder="Type code and press Shift+Enter to execute"></textarea>
+        </div>
       </div>
-      <div class="dot-grid">
-        <div class="dot" data-value="1">1</div>
-        <div class="dot" data-value="2">2</div>
-        <div class="dot" data-value="3">3</div>
-        <div class="dot" data-value="4">4</div>
-        <div class="dot" data-value="5">5</div>
-        <div class="dot" data-value="6">6</div>
-        <div class="dot" data-value="7">7</div>
-        <div class="dot" data-value="8">8</div>
-        <div class="dot" data-value="9">9</div>
-        <div class="dot" data-value="*">*</div>
-        <div class="dot" data-value="0">0</div>
-        <div class="dot" data-value="#">#</div>
-      </div>
+    </section>
+    
+    <!-- データセクションとディクショナリーセクションをdivで囲む -->
+    <div class="right-sections">
+      <!-- データセクション → メモリセクション -->
+      <section class="memory-section">
+        <h2 title="XXX">Memory</h2>
+        <div class="stack-area">
+          <h3 title="XXX">Stack</h3>
+        </div>
+        <div class="register-area">
+          <h3 title="XXX">Registers</h3>
+        </div>
+      </section>
+      
+      <!-- ディクショナリーセクション → 関数セクション -->
+      <section class="functions-section">
+        <h2 title="XXX">Functions</h2>
+        <div class="builtin-words-area">
+          <h3 title="XXX">Built-In Words</h3>
+        </div>
+        <div class="custom-words-area">
+          <h3 title="XXX">Custom Words</h3>
+        </div>
+      </section>
     </div>
-  </div>
-</div>
-    </section>
-    <section class="dictionary-section">
-      <h2 title="XXX">Dictionary</h2>
-      <div class="builtin-words-area">
-        <h3 title="XXX">Built-In Words</h3>
-      </div>
-      <div class="custom-words-area">
-        <h3 title="XXX">Custom Words</h3>
-      </div>
-    </section>
   </article>
   <footer>© 2025
     <a href="https://github.com/masamoto1982" target="_blank">masamoto yamashiro</a>
