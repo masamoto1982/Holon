@@ -6,7 +6,8 @@ const state = {
   registers: {},      // レジスタ（名前付き変数）
   dictionary: {},     // ワード辞書
   output: "",         // 出力バッファ
-  logs: []            // デバッグログ
+  logs: [],           // デバッグログ
+  buffer: ""          // 入力バッファ
 };
 
 // デバッグログ機能
@@ -257,6 +258,47 @@ const dictionaryOps = {
   }
 };
 
+// バッファー操作ユーティリティ
+const bufferOps = {
+  // バッファーに追加
+  add: (text) => {
+    state.buffer += text;
+    updateBufferDisplay();
+    log(`Added to buffer: ${text}, now buffer is: ${state.buffer}`);
+  },
+  
+  // 末尾削除
+  backspace: () => {
+    state.buffer = state.buffer.slice(0, -1);
+    updateBufferDisplay();
+    log(`Backspace buffer, now buffer is: ${state.buffer}`);
+  },
+  
+  // バッファーをクリア
+  clear: () => {
+    state.buffer = '';
+    updateBufferDisplay();
+    log(`Cleared buffer`);
+  },
+  
+  // バッファーの内容を取得して入力エリアに送信
+  submit: () => {
+    if (state.buffer) {
+      insertAtCursor(state.buffer + ' ');
+      log(`Submitted buffer: ${state.buffer}`);
+      bufferOps.clear();
+    }
+  }
+};
+
+// バッファー表示を更新
+const updateBufferDisplay = () => {
+  const bufferContent = document.querySelector('.buffer-content');
+  if (bufferContent) {
+    bufferContent.textContent = state.buffer;
+  }
+};
+
 // ポケベル信号の定義
 const pagerTones = {
   // 各数字に対応するポケベル信号の周波数と長さ
@@ -314,22 +356,60 @@ const playPagerTone = (digit) => {
   });
 };
 
+// 各ドットに割り当てる値 (2の累乗)
+const dotValues = [
+  1, 2, 4, 8, 16,
+  32, 64, 128, 256, 512,
+  1024, 2048, 4096, 8192, 16384,
+  32768, 65536, 131072, 262144, 524288,
+  1048576, 2097152, 4194304, 8388608, 16777216
+];
+
+// 文字認識のためのパターン定義（合計値→文字のマッピング）
+const letterPatterns = {
+  18405233: 'M',  // 指定された例
+  33080895: 'O',  // 指定された例
+  1113663: 'P',   // 指定された例
+  // 他の文字のパターンはプロジェクトの進行に合わせて追加
+};
+
+// ドット配置とワードマッピングの定義
+const dotConfig = [
+  // 位置, 数値, ワード
+  [0, '1', 'DUP'],    // 左上
+  [2, '2', 'SWAP'],   // 上中央
+  [4, '3', 'ROT'],    // 右上
+  [10, '4', '+'],     // 中段左
+  [12, '5', '*'],     // 中央
+  [14, '6', '/'],     // 中段右
+  [20, '7', 'DEF'],   // 左下
+  [22, '8', 'IF'],    // 下中央
+  [24, '9', 'DEL']    // 右下
+];
+
+// 特殊ドットの定義
+const specialDots = [
+  { value: '0', word: 'DROP' },
+  { value: '*', word: 'OVER' },
+  { value: '#', word: 'PRINTLN' }
+];
+
 // 基本機能ワードの初期化
 const initializeBuiltins = () => {
   // 基本的なFORTHワードのマッピング
   const forthWords = [
     { digit: '1', word: 'DUP', description: 'スタックの最上位の値を複製します' },
-    { digit: '2', word: 'DROP', description: 'スタックの最上位の値を捨てます' },
-    { digit: '3', word: 'SWAP', description: 'スタックの上位2つの値を入れ替えます' },
-    { digit: '4', word: 'OVER', description: '2番目の値のコピーをスタックの最上位に置きます' },
-    { digit: '5', word: 'ROT', description: '上位3つの値をローテーションします (a b c -> b c a)' },
-    { digit: '6', word: '+', description: 'スタックの上位2つの値を加算します' },
-    { digit: '7', word: '-', description: 'スタックの上位2つの値を減算します (a b -> a-b)' },
-    { digit: '8', word: '*', description: 'スタックの上位2つの値を乗算します' },
-    { digit: '9', word: '/', description: 'スタックの上位2つの値を除算します (a b -> a/b)' },
-    { digit: '0', word: 'IF', description: '条件分岐を行います' },
-    { digit: '*', word: 'DEF', description: '新しいワードを定義します' },
-    { digit: '#', word: 'DEL', description: 'ワードを削除します' }
+    { digit: '2', word: 'SWAP', description: 'スタックの上位2つの値を入れ替えます' },
+    { digit: '3', word: 'ROT', description: '上位3つの値をローテーションします (a b c -> b c a)' },
+    { digit: '4', word: '+', description: 'スタックの上位2つの値を加算します' },
+    { digit: '5', word: '*', description: 'スタックの上位2つの値を乗算します' },
+    { digit: '6', word: '/', description: 'スタックの上位2つの値を除算します (a b -> a/b)' },
+    { digit: '7', word: 'DEF', description: '新しいワードを定義します' },
+    { digit: '8', word: 'IF', description: '条件分岐を行います' },
+    { digit: '9', word: 'DEL', description: 'ワードを削除します' },
+    { digit: '0', word: 'DROP', description: 'スタックの最上位の値を捨てます' },
+    { digit: '*', word: 'OVER', description: '2番目の値のコピーをスタックの最上位に置きます' },
+    { digit: '#', word: 'PRINTLN', description: 'スタックの最上位の値を出力します' }
   ];
 
   // ワードと数字のマッピングを保存
@@ -453,243 +533,366 @@ const initializeBuiltins = () => {
   dictionaryOps.define("DEL", () => {
     // 実際の実装はトークン処理時に行う
   }, true, 'ワードを削除します');
-};
-
-// 文字入力マッピング（スワイプ時に使用）
-const charMap = {
-  '1': {'0': 'A', '45': 'B', '90': 'C', '135': 'D', '180': 'E', '-135': 'F', '-90': 'G', '-45': 'H'},
-  '2': {'0': 'I', '45': 'J', '90': 'K', '135': 'L', '180': 'M', '-135': 'N', '-90': 'O', '-45': 'P'},
-  '3': {'0': 'Q', '45': 'R', '90': 'S', '135': 'T', '180': 'U', '-135': 'V', '-90': 'W', '-45': 'X'},
-  '4': {'0': 'Y', '45': 'Z', '90': '.', '135': ',', '180': ';', '-135': ':', '-90': '(', '-45': ')'},
-  '5': {'0': '+', '45': '-', '90': '*', '135': '/', '180': '=', '-135': '<', '-90': '>', '-45': '!'},
-  '6': {'0': '{', '45': '}', '90': '[', '135': ']', '180': '|', '-135': '\\', '-90': '/', '-45': '?'},
-  '7': {'0': '~', '45': '`', '90': '@', '135': '#', '180': '$', '-135': '%', '-90': '^', '-45': '&'},
-  '8': {'0': '_', '45': '"', '90': '\'', '135': ' ', '180': '\n', '-135': '\t', '-90': '0', '-45': '1'},
-  '9': {'0': '2', '45': '3', '90': '4', '135': '5', '180': '6', '-135': '7', '-90': '8', '-45': '9'},
+  
+  // 出力ワード
+  dictionaryOps.define("PRINTLN", () => {
+    if (state.stack.length < 1) throw new Error("PRINTLN requires at least one item on the stack");
+    const value = stackOps.pop();
+    if (value instanceof HolonString) {
+      state.output += value.value + "\n";
+    } else {
+      state.output += value.toString() + "\n";
+    }
+  }, true, 'スタックの最上位の値を出力します');
 };
 
 // UI要素の取得
 const elements = {
   output: null,
   input: null,
-  stack: null,
-  registers: null,
   builtinWords: null,
   customWords: null
 };
 
-// 組み込みワードエリアのカンバスボタンを描画する関数
-const drawWordButtons = () => {
-  console.log("Drawing word buttons...");
+// なぞり書きの状態を追跡
+const drawState = {
+  isActive: false,
+  detectedDots: new Set(),
+  totalValue: 0
+};
+
+// ドットグリッドの設定
+const setupDotGrid = () => {
   const container = elements.builtinWords;
   if (!container) {
     console.error("Built-in words container not found!");
     return;
   }
   
-  container.innerHTML = '<h3 title="XXX">Built-In Words</h3>';
+  container.innerHTML = `
+    <h3 title="XXX">Built-In Words</h3>
+    <div class="buffer-display">
+      <div class="buffer-content"></div>
+    </div>
+    <div id="dot-grid" class="dot-grid"></div>
+    <div class="action-buttons">
+      <button id="clear-buffer">削除</button>
+      <button id="submit-buffer">確定</button>
+    </div>
+  `;
   
-  // 組み込みワードとして登録された数字とワードのマッピングを使用
-  const wordDigitMap = state.wordDigitMap || {};
-  console.log("Word-digit map:", wordDigitMap);
+  const dotGrid = document.getElementById('dot-grid');
+  if (!dotGrid) return;
   
-  if (Object.keys(wordDigitMap).length === 0) {
-    console.warn("No word-digit mappings found!");
-    // マッピングがなければデフォルト値を使用
-    Object.assign(wordDigitMap, {
-      '1': 'DUP', '2': 'DROP', '3': 'SWAP',
-      '4': 'OVER', '5': 'ROT', '6': '+',
-      '7': '-', '8': '*', '9': '/',
-      '*': 'DEF', '0': 'IF', '#': 'DEL'
-    });
+  // 5x5のグリッドを作成
+  for (let i = 0; i < 25; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    dot.dataset.index = i;
+    dot.dataset.value = dotValues[i];
+    
+    // 特定のポジションにワードと数字を割り当て
+    const config = dotConfig.find(c => c[0] === i);
+    if (config) {
+      dot.textContent = config[1];
+      dot.dataset.digit = config[1];
+      dot.dataset.word = config[2];
+      dot.setAttribute('title', config[2]);
+    }
+    
+    dotGrid.appendChild(dot);
   }
   
-  // カンバスボタンを格納するグループdivを作成
-  const groupDiv = document.createElement('div');
-  groupDiv.className = 'word-group canvas-buttons';
+  // 特殊ドットを追加 (0, *, #)
+  specialDots.forEach(spec => {
+    const dot = document.createElement('div');
+    dot.className = 'dot special-dot';
+    dot.textContent = spec.value;
+    dot.dataset.digit = spec.value;
+    dot.dataset.word = spec.word;
+    dot.setAttribute('title', spec.word);
+    dotGrid.appendChild(dot);
+  });
   
-  // 数字ボタンを作成（ポケベルの数字キーパッドレイアウト）
-  const layout = [
-    ['1', '2', '3'],
-    ['4', '5', '6'],
-    ['7', '8', '9'],
-    ['*', '0', '#']
-  ];
+  // 線描画用のキャンバス
+  const canvas = document.createElement('canvas');
+  canvas.id = 'line-canvas';
+  canvas.width = dotGrid.offsetWidth;
+  canvas.height = dotGrid.offsetHeight;
+  dotGrid.appendChild(canvas);
   
-  layout.forEach(row => {
-    row.forEach(digit => {
-      const word = wordDigitMap[digit] || '';
-      
-      // カンバス要素を作成
-      const canvas = document.createElement('canvas');
-      canvas.width = 80;
-      canvas.height = 80;
-      canvas.className = 'word-button';
-      canvas.dataset.digit = digit;
-      canvas.dataset.word = word;
-      
-      // ポケベル信号のボタンを描画
-      drawPagerButton(canvas, digit, word);
-      
-      // イベントリスナーを設定
-      setupButtonListeners(canvas);
-      
-      groupDiv.appendChild(canvas);
+  // 各ドットにイベントリスナーを設定
+  setupDotEventListeners();
+  
+  // アクションボタンのイベントリスナーを設定
+  setupActionButtons();
+};
+
+// ドットイベントリスナーの設定
+const setupDotEventListeners = () => {
+  const dots = document.querySelectorAll('.dot');
+  
+  dots.forEach(dot => {
+    let longPressTimer;
+    
+    // タッチ/マウス開始
+    dot.addEventListener('mousedown', e => {
+      e.preventDefault();
+      handleDotStart(dot, e);
+    });
+    
+    dot.addEventListener('touchstart', e => {
+      e.preventDefault();
+      handleDotStart(dot, e);
+    });
+    
+    // 単純クリック（数字入力）
+    dot.addEventListener('click', e => {
+      // 長押しやなぞり書き中でない場合のみ処理
+      if (!longPressTimer && !drawState.isActive) {
+        const digit = dot.dataset.digit;
+        if (digit) {
+          playPagerTone(digit);
+          bufferOps.add(digit);
+        }
+      }
     });
   });
   
-  container.appendChild(groupDiv);
-  console.log("Word buttons drawn:", groupDiv.children.length);
+  // 移動検出用イベント
+  document.addEventListener('mousemove', e => {
+    if (drawState.isActive) {
+      detectDot(e);
+    }
+  });
+  
+  document.addEventListener('touchmove', e => {
+    if (drawState.isActive) {
+      detectDot(e);
+    }
+  });
+  
+  // 終了イベント
+  document.addEventListener('mouseup', () => {
+    endDrawing();
+  });
+  
+  document.addEventListener('touchend', () => {
+    endDrawing();
+  });
+  
+  // ドットの開始処理
+  function handleDotStart(dot, e) {
+    const digit = dot.dataset.digit;
+    const word = dot.dataset.word;
+    
+    // 数字キーの場合は長押し検出開始
+    if (digit) {
+      longPressTimer = setTimeout(() => {
+        playPagerTone(digit);
+        if (word) {
+          bufferOps.add(word + ' ');
+        }
+        longPressTimer = null;
+      }, 500);
+    }
+    
+    // なぞり書き開始
+    startDrawing(dot);
+  }
 };
 
-// ポケベルボタンを描画する関数
-const drawPagerButton = (canvas, digit, word) => {
-  if (!canvas) {
-    console.error("Canvas is null or undefined!");
-    return;
+// アクションボタンの設定
+const setupActionButtons = () => {
+  const clearButton = document.getElementById('clear-buffer');
+  const submitButton = document.getElementById('submit-buffer');
+  
+  if (clearButton) {
+    // ダブルタップで全消去、シングルタップで1文字削除
+    let tapCount = 0;
+    clearButton.addEventListener('click', () => {
+      tapCount++;
+      setTimeout(() => {
+        if (tapCount === 1) {
+          bufferOps.backspace();
+        } else if (tapCount >= 2) {
+          bufferOps.clear();
+        }
+        tapCount = 0;
+      }, 300);
+    });
   }
   
-  console.log(`Drawing pager button: ${digit} - ${word}`);
+  if (submitButton) {
+    submitButton.addEventListener('click', () => {
+      bufferOps.submit();
+    });
+  }
+};
+
+// なぞり書き開始
+const startDrawing = (dot) => {
+  // 始点がドットでない場合や特殊ドットの場合はスキップ
+  if (!dot || !dot.dataset.value) return;
+  
+  drawState.isActive = true;
+  drawState.detectedDots = new Set();
+  drawState.totalValue = 0;
+  
+  // 最初のドットを追加
+  addDetectedDot(dot);
+  log(`Started drawing with dot ${dot.dataset.index}`);
+};
+
+// なぞり書き終了
+const endDrawing = () => {
+  if (!drawState.isActive) return;
+  
+  // 長押しタイマーがあればクリア
+  document.querySelectorAll('.dot').forEach(dot => {
+    if (dot.longPressTimer) {
+      clearTimeout(dot.longPressTimer);
+      dot.longPressTimer = null;
+    }
+  });
+  
+  // 文字認識
+  if (drawState.detectedDots.size > 1) {
+    const detectedLetter = recognizeLetter(drawState.totalValue);
+    if (detectedLetter) {
+      log(`Recognized letter: ${detectedLetter}`);
+      bufferOps.add(detectedLetter);
+    }
+  }
+  
+  // 視覚効果をクリア
+  setTimeout(() => {
+    clearCanvas();
+    document.querySelectorAll('.dot.detected').forEach(d => {
+      d.classList.remove('detected');
+    });
+  }, 500);
+  
+  drawState.isActive = false;
+  log(`Ended drawing, total value: ${drawState.totalValue}`);
+};
+
+// ドット検出
+const detectDot = (e) => {
+  if (!drawState.isActive) return;
+  
+  const point = e.type.includes('touch') ? e.touches[0] : e;
+  const x = point.clientX;
+  const y = point.clientY;
+  
+  // すべてのドットをチェック
+ // すべてのドットをチェック
+  document.querySelectorAll('.dot').forEach(dot => {
+    // 特殊ドットまたは既に検出されたドットはスキップ
+    if (dot.classList.contains('special-dot') || drawState.detectedDots.has(dot)) return;
+    
+    const rect = dot.getBoundingClientRect();
+    // ポインターがドット上にあるか
+    if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+      addDetectedDot(dot);
+    }
+  });
+  
+  // キャンバスの線を更新
+  updateCanvas();
+};
+
+// 検出されたドットを追加
+const addDetectedDot = (dot) => {
+  dot.classList.add('detected');
+  drawState.detectedDots.add(dot);
+  
+  // 2の累乗値を追加（合計値を計算）
+  if (dot.dataset.value) {
+    drawState.totalValue += parseInt(dot.dataset.value, 10);
+  }
+  
+  log(`Detected dot ${dot.dataset.index}, value: ${dot.dataset.value}, current total: ${drawState.totalValue}`);
+};
+
+// 合計値から文字を認識
+const recognizeLetter = (totalValue) => {
+  log(`Recognizing letter for total value: ${totalValue}`);
+  
+  // 合計値が既知のパターンに一致するか確認
+  const letter = letterPatterns[totalValue];
+  
+  if (letter) {
+    log(`Recognized letter: ${letter}`);
+    return letter;
+  }
+  
+  // 最も近い値を見つける（許容範囲内）
+  const tolerance = 1000; // 許容誤差
+  let closestDiff = Infinity;
+  let closestLetter = null;
+  
+  for (const [value, l] of Object.entries(letterPatterns)) {
+    const numValue = parseInt(value, 10);
+    const diff = Math.abs(numValue - totalValue);
+    
+    if (diff < tolerance && diff < closestDiff) {
+      closestDiff = diff;
+      closestLetter = l;
+    }
+  }
+  
+  if (closestLetter) {
+    log(`Found closest letter: ${closestLetter} (diff: ${closestDiff})`);
+    return closestLetter;
+  }
+  
+  log('No matching letter found');
+  return null;
+};
+
+// キャンバスを更新
+const updateCanvas = () => {
+  const canvas = document.getElementById('line-canvas');
+  if (!canvas) return;
+  
   const ctx = canvas.getContext('2d');
-  if (!ctx) {
-    console.error("Could not get canvas context!");
-    return;
-  }
+  const dotGrid = document.getElementById('dot-grid');
+  const dotGridRect = dotGrid.getBoundingClientRect();
   
-  const width = canvas.width;
-  const height = canvas.height;
+  canvas.width = dotGridRect.width;
+  canvas.height = dotGridRect.height;
   
-  // 背景をクリア
-  ctx.clearRect(0, 0, width, height);
-  
-  // 円を描画
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.beginPath();
-  ctx.arc(width/2, height/2, width/2 - 5, 0, Math.PI * 2);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-  ctx.strokeStyle = '#dddddd';
+  
+  // 検出されたドットの中心点を通る線を描画
+  let isFirst = true;
+  drawState.detectedDots.forEach(dot => {
+    const rect = dot.getBoundingClientRect();
+    const x = rect.left - dotGridRect.left + rect.width / 2;
+    const y = rect.top - dotGridRect.top + rect.height / 2;
+    
+    if (isFirst) {
+      ctx.moveTo(x, y);
+      isFirst = false;
+    } else {
+      ctx.lineTo(x, y);
+    }
+  });
+  
+  ctx.strokeStyle = '#ff0000';
   ctx.lineWidth = 2;
   ctx.stroke();
-  
-  // 数字を描画
-  ctx.font = 'bold 24px sans-serif';
-  ctx.fillStyle = '#333333';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(digit, width/2, height/2 - 5);
-  
-  // ワード名を描画
-  ctx.font = '12px sans-serif';
-  ctx.fillText(word, width/2, height/2 + 15);
 };
 
-// ボタンのイベントリスナーを設定
-const setupButtonListeners = (canvas) => {
-  const digit = canvas.dataset.digit;
-  const word = canvas.dataset.word;
+// キャンバスをクリア
+const clearCanvas = () => {
+  const canvas = document.getElementById('line-canvas');
+  if (!canvas) return;
   
-  let longPressTimer;
-  let touchStartX, touchStartY;
-  let isSwiping = false;
-  
-  // クリック（タップ）イベント - 数字を入力
-  canvas.addEventListener('click', (e) => {
-    // 長押しまたはスワイプ中は処理しない
-    if (longPressTimer || isSwiping) return;
-    
-    // ポケベル信号を再生
-    playPagerTone(digit);
-    
-    // 数字を入力エリアに挿入
-    insertAtCursor(digit);
-  });
-  
-  // マウスダウン/タッチスタート - 長押し検出開始
-  const startHandler = (e) => {
-    // タッチイベントの場合は座標を記録
-    if (e.type === 'touchstart') {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-    }
-    
-    // 長押し検出用タイマーを設定
-    longPressTimer = setTimeout(() => {
-      // ポケベル信号を再生
-      playPagerTone(digit);
-      
-      // ワードを入力エリアに挿入
-      insertAtCursor(word + ' ');
-      
-      // ボタンの見た目を一時的に変更
-      canvas.classList.add('pressed');
-      setTimeout(() => {
-        canvas.classList.remove('pressed');
-      }, 200);
-      
-      longPressTimer = null;
-    }, 500); // 500ms以上の長押しで発動
-  };
-  
-  // マウスアップ/タッチエンド - タイマークリア
-  const endHandler = () => {
-    if (longPressTimer) {
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
-    }
-    isSwiping = false;
-  };
-  
-  // タッチムーブ - スワイプ検出
-  const moveHandler = (e) => {
-    if (!e.touches || isSwiping || !longPressTimer) return;
-    
-    const touchX = e.touches[0].clientX;
-    const touchY = e.touches[0].clientY;
-    
-    // スワイプの距離を計算
-    const distX = touchX - touchStartX;
-    const distY = touchY - touchStartY;
-    const distance = Math.sqrt(distX * distX + distY * distY);
-    
-    // スワイプ検出（一定距離以上移動した場合）
-    if (distance > 20) {
-      // タイマーをクリア
-      clearTimeout(longPressTimer);
-      longPressTimer = null;
-      isSwiping = true;
-      
-      // スワイプの角度を計算
-      const angle = Math.atan2(distY, distX) * 180 / Math.PI;
-      
-      // 8方向に量子化
-      const directions = [0, 45, 90, 135, 180, -135, -90, -45];
-      const closestDirection = directions.reduce((prev, curr) => 
-        Math.abs(curr - angle) < Math.abs(prev - angle) ? curr : prev
-      );
-      
-      // 対応する文字を取得
-      const map = charMap[digit] || {};
-      const char = map[closestDirection] || '';
-      
-      if (char) {
-        // ポケベル信号を再生
-        playPagerTone(digit);
-        
-        // 文字を入力エリアに挿入
-        insertAtCursor(char);
-      }
-    }
-  };
-  
-  // イベントリスナーを登録
-  canvas.addEventListener('mousedown', startHandler);
-  canvas.addEventListener('touchstart', startHandler);
-  
-  canvas.addEventListener('mouseup', endHandler);
-  canvas.addEventListener('touchend', endHandler);
-  canvas.addEventListener('touchcancel', endHandler);
-  
-  canvas.addEventListener('touchmove', moveHandler);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 };
 
 // カーソル位置にテキストを挿入する関数
@@ -724,7 +927,6 @@ const initializeMemoryDisplays = () => {
 };
 
 // UI更新関数
-// UI更新関数の続き
 const updateUI = () => {
   // 出力エリア更新
   elements.output.textContent = state.output;
@@ -735,8 +937,11 @@ const updateUI = () => {
   // レジスタエリア更新
   updateRegisterDisplay();
   
-  // 辞書ワード表示更新
-  updateWordDisplay();
+  // バッファーの更新
+  updateBufferDisplay();
+  
+  // カスタムワード表示を更新
+  updateCustomWordsDisplay();
 };
 
 // スタック表示を更新
@@ -799,15 +1004,6 @@ const updateRegisterDisplay = () => {
   }
   
   registerArea.appendChild(registerDisplay);
-};
-
-// ワード表示を更新
-const updateWordDisplay = () => {
-  // 組み込みワード（ポケベルボタン）を描画
-  drawWordButtons();
-  
-  // カスタムワード表示を更新
-  updateCustomWordsDisplay();
 };
 
 // カスタムワード表示を更新
@@ -1121,35 +1317,90 @@ const addCSSStyles = () => {
       padding: 10px;
     }
     
-    .canvas-buttons {
+    .buffer-display {
+      width: 100%;
+      height: 40px;
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      margin-bottom: 10px;
+      padding: 5px;
+      box-sizing: border-box;
+      overflow: hidden;
+      white-space: nowrap;
+      position: relative;
+    }
+    
+    .buffer-content {
+      font-family: var(--font-monospace);
+      font-size: 16px;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+    }
+    
+    .dot-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(5, 1fr);
       gap: 10px;
-      width: 100%;
+      margin-bottom: 15px;
+      position: relative;
     }
     
-    .word-button {
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    
-    canvas.word-button {
-      width: 100%;
-      height: auto;
-      aspect-ratio: 1/1;
+    .dot {
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      background: white;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      background-color: #e0e0e0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      cursor: pointer;
+      position: relative;
     }
     
-    .word-button.pressed {
-      transform: scale(0.95);
-      box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+    .dot.detected {
+      background-color: #ff9999;
+    }
+    
+    .dot.special-dot {
+      background-color: #ffcc99;
+    }
+    
+    #line-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+    
+    .action-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+    
+    .action-buttons button {
+      flex: 1;
+      padding: 8px;
+      margin: 0 5px;
+      background-color: #f0f0f0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      cursor: pointer;
     }
     
     @media (max-width: 768px) {
-      .canvas-buttons {
+      .dot-grid {
         gap: 15px;
+      }
+      
+      .dot {
+        width: 35px;
+        height: 35px;
+        font-size: 12px;
       }
     }
   `;
@@ -1178,6 +1429,9 @@ const init = () => {
 
   // 組み込みワードの初期化
   initializeBuiltins();
+  
+  // ドットグリッドを設定
+  setupDotGrid();
 
   // イベントリスナーの設定
   initEventListeners();
@@ -1190,10 +1444,6 @@ const init = () => {
     "Example: 2 3 + PRINTLN\n" +
     "Define custom word: DEF DOUBLE { DUP + }\n";
   updateUI();
-  
-  // 問題のデバッグ用
-  console.log("Built-in words area:", elements.builtinWords);
-  console.log("Word-digit map:", state.wordDigitMap);
 };
 
 // アプリケーション起動

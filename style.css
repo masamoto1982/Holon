@@ -138,6 +138,79 @@ textarea {
   background: #f0f0f0;
 }
 
+.dot-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.dot {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  cursor: pointer;
+  position: relative;
+}
+
+.dot.detected {
+  background-color: #ff9999;
+}
+
+.dot.special-dot {
+  background-color: #ffcc99;
+}
+
+.buffer-display {
+  width: 100%;
+  height: 40px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  margin-bottom: 10px;
+  padding: 5px;
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.buffer-content {
+  font-family: var(--font-monospace);
+  font-size: 16px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+#line-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.action-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+}
+
+.action-buttons button {
+  flex: 1;
+  padding: 8px;
+  margin: 0 5px;
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
 footer {
   background: linear-gradient(45deg, var(--background-dark), var(--background-light));
   flex: 0 0 auto;
