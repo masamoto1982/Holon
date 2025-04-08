@@ -284,7 +284,7 @@ const bufferOps = {
   // バッファーの内容を取得して入力エリアに送信
   submit: () => {
     if (state.buffer) {
-      insertAtCursor(state.buffer + ' ');
+      insertAtCursor(state.buffer);
       log(`Submitted buffer: ${state.buffer}`);
       bufferOps.clear();
     }
@@ -373,52 +373,33 @@ const letterPatterns = {
   // 他の文字のパターンはプロジェクトの進行に合わせて追加
 };
 
-// ドット配置とワードマッピングの定義
-const dotConfig = [
-  // 位置, 数値, ワード
-  [0, '1', 'DUP'],    // 左上
-  [2, '2', 'SWAP'],   // 上中央
-  [4, '3', 'ROT'],    // 右上
-  [10, '4', '+'],     // 中段左
-  [12, '5', '*'],     // 中央
-  [14, '6', '/'],     // 中段右
-  [20, '7', 'DEF'],   // 左下
-  [22, '8', 'IF'],    // 下中央
-  [24, '9', 'DEL']    // 右下
-];
+// ドットとワードのマッピング
+const dotWordMapping = {
+  // 四則演算子（指定されたドット値）
+  '128': '+',       // 長押しで +
+  '131072': '-',    // 長押しで -
+  '2048': '*',      // 長押しで *
+  '8192': '/',      // 長押しで /
+  
+  // 数字ドット（0-9）のワードマッピング
+  '1': 'DUP',       // 左上
+  '4': 'DROP',      // 上段中央
+  '16': 'SWAP',     // 右上
+  '32': 'OVER',     // 中段左
+  '512': 'ROT',     // 中央
+  '8388608': 'PRINTLN',  // 中段右
+  '64': 'DEF',      // 左下
+  '1024': 'IF',     // 下段中央
+  '16384': 'DEL'    // 右下
+};
 
-// 特殊ドットの定義
-const specialDots = [
-  { value: '0', word: 'DROP' },
-  { value: '*', word: 'OVER' },
-  { value: '#', word: 'PRINTLN' }
-];
+// モバイルかどうかを検出する関数
+const isMobileDevice = () => {
+  return window.innerWidth <= 768;
+};
 
 // 基本機能ワードの初期化
 const initializeBuiltins = () => {
-  // 基本的なFORTHワードのマッピング
-  const forthWords = [
-    { digit: '1', word: 'DUP', description: 'スタックの最上位の値を複製します' },
-    { digit: '2', word: 'SWAP', description: 'スタックの上位2つの値を入れ替えます' },
-    { digit: '3', word: 'ROT', description: '上位3つの値をローテーションします (a b c -> b c a)' },
-    { digit: '4', word: '+', description: 'スタックの上位2つの値を加算します' },
-    { digit: '5', word: '*', description: 'スタックの上位2つの値を乗算します' },
-    { digit: '6', word: '/', description: 'スタックの上位2つの値を除算します (a b -> a/b)' },
-    { digit: '7', word: 'DEF', description: '新しいワードを定義します' },
-    { digit: '8', word: 'IF', description: '条件分岐を行います' },
-    { digit: '9', word: 'DEL', description: 'ワードを削除します' },
-    { digit: '0', word: 'DROP', description: 'スタックの最上位の値を捨てます' },
-    { digit: '*', word: 'OVER', description: '2番目の値のコピーをスタックの最上位に置きます' },
-    { digit: '#', word: 'PRINTLN', description: 'スタックの最上位の値を出力します' }
-  ];
-
-  // ワードと数字のマッピングを保存
-  state.wordDigitMap = {};
-  forthWords.forEach(item => {
-    state.wordDigitMap[item.digit] = item.word;
-  });
-
-  // 各ワードを定義
   // スタック操作
   dictionaryOps.define("DUP", () => {
     if (state.stack.length < 1) throw new Error("DUP requires at least one item on the stack");
@@ -561,58 +542,156 @@ const drawState = {
   totalValue: 0
 };
 
-// ドットグリッドの設定
-const setupDotGrid = () => {
+// ドットの設定と構成
+const setupFunctionsSection = () => {
   const container = elements.builtinWords;
   if (!container) {
     console.error("Built-in words container not found!");
     return;
   }
   
-  container.innerHTML = `
-    <h3 title="XXX">Built-In Words</h3>
-    <div class="buffer-display">
-      <div class="buffer-content"></div>
-    </div>
-    <div id="dot-grid" class="dot-grid"></div>
-    <div class="action-buttons">
-      <button id="clear-buffer">削除</button>
-      <button id="submit-buffer">確定</button>
-    </div>
-  `;
+  // モバイルモードかどうかを確認
+  const mobile = isMobileDevice();
   
+  if (mobile) {
+    // モバイルモード: テンキー風ドットグリッド
+    container.innerHTML = `
+      <h3 title="XXX">Built-In Words</h3>
+      <div class="buffer-display">
+        <div class="buffer-content"></div>
+      </div>
+      <div id="dot-grid" class="dot-grid"></div>
+    `;
+    
+    setupDotGrid();
+  } else {
+    // デスクトップモード: 通常ボタンリスト
+    setupDesktopWordButtons();
+  }
+};
+
+// モバイルモード用のドットグリッド設定// モバイルモード用のドットグリッド設定を修正
+const setupDotGrid = () => {
   const dotGrid = document.getElementById('dot-grid');
   if (!dotGrid) return;
   
-  // 5x5のグリッドを作成
-  for (let i = 0; i < 25; i++) {
-    const dot = document.createElement('div');
-    dot.className = 'dot';
-    dot.dataset.index = i;
-    dot.dataset.value = dotValues[i];
+  // Flexboxを使ったレイアウト
+  dotGrid.innerHTML = '';
+  
+  // 5行のフレックスコンテナを作成
+  for (let row = 0; row < 5; row++) {
+    const rowContainer = document.createElement('div');
+    rowContainer.className = 'dot-row';
     
-    // 特定のポジションにワードと数字を割り当て
-    const config = dotConfig.find(c => c[0] === i);
-    if (config) {
-      dot.textContent = config[1];
-      dot.dataset.digit = config[1];
-      dot.dataset.word = config[2];
-      dot.setAttribute('title', config[2]);
+    // 各行に5つのドットを配置
+    for (let col = 0; col < 5; col++) {
+      const index = row * 5 + col;
+      const value = dotValues[index];
+      
+      // ドットを作成
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      dot.dataset.index = index;
+      dot.dataset.value = value;
+      
+      // 数字ドットの位置を定義
+      const numericPositions = {
+        0: { digit: '1', word: 'DUP' },
+        2: { digit: '2', word: 'SWAP' },
+        4: { digit: '3', word: 'ROT' },
+        10: { digit: '4', word: 'OVER' },
+        12: { digit: '5', word: '' },
+        14: { digit: '6', word: '' },
+        20: { digit: '7', word: 'DEF' },
+        22: { digit: '8', word: 'IF' },
+        24: { digit: '9', word: 'DEL' }
+      };
+      
+      // その他の特殊ドットの位置
+      const specialWordPositions = {
+        8: { word: '+' },
+        12: { word: '*' },
+		14: { word: '/' },
+        18: { word: '-' }
+		
+      };
+      
+      // 数字ドットの場合
+      if (numericPositions[index]) {
+        dot.classList.add('numeric');
+        const config = numericPositions[index];
+        dot.dataset.digit = config.digit;
+        
+        // 数字を表示
+        const digitElement = document.createElement('div');
+        digitElement.className = 'digit';
+        digitElement.textContent = config.digit;
+        dot.appendChild(digitElement);
+        
+        // ワードがあれば表示
+        if (config.word) {
+          dot.dataset.word = config.word;
+          dot.setAttribute('title', config.word);
+          
+          const wordElement = document.createElement('div');
+          wordElement.className = 'word';
+          wordElement.textContent = config.word;
+          dot.appendChild(wordElement);
+        }
+      }
+      // 特殊ワードドットの場合
+      else if (specialWordPositions[index]) {
+        const config = specialWordPositions[index];
+        dot.dataset.word = config.word;
+        dot.setAttribute('title', config.word);
+        
+        const wordElement = document.createElement('div');
+        wordElement.className = 'word-only';
+        wordElement.textContent = config.word;
+        dot.appendChild(wordElement);
+      }
+      
+      rowContainer.appendChild(dot);
     }
     
-    dotGrid.appendChild(dot);
+    dotGrid.appendChild(rowContainer);
   }
   
-  // 特殊ドットを追加 (0, *, #)
-  specialDots.forEach(spec => {
-    const dot = document.createElement('div');
-    dot.className = 'dot special-dot';
-    dot.textContent = spec.value;
-    dot.dataset.digit = spec.value;
-    dot.dataset.word = spec.word;
-    dot.setAttribute('title', spec.word);
-    dotGrid.appendChild(dot);
-  });
+  // 特殊ボタン行を追加（*、0、#）
+  const specialRow = document.createElement('div');
+  specialRow.className = 'special-row';
+  
+  // * ボタン
+  const starButton = document.createElement('div');
+  starButton.className = 'special-button star';
+  starButton.textContent = '*';
+  starButton.dataset.action = 'delete';
+  starButton.setAttribute('title', '削除');
+  specialRow.appendChild(starButton);
+  
+  // 0 ボタン
+  const zeroButton = document.createElement('div');
+  zeroButton.className = 'dot numeric';
+  
+  const zeroDigit = document.createElement('div');
+  zeroDigit.className = 'digit';
+  zeroDigit.textContent = '0';
+  zeroButton.appendChild(zeroDigit);
+  
+  zeroButton.dataset.digit = '0';
+  zeroButton.dataset.action = 'space';
+  zeroButton.setAttribute('title', '0 / 長押しで空白');
+  specialRow.appendChild(zeroButton);
+  
+  // # ボタン
+  const hashButton = document.createElement('div');
+  hashButton.className = 'special-button hash';
+  hashButton.textContent = '#';
+  hashButton.dataset.action = 'submit';
+  hashButton.setAttribute('title', '確定');
+  specialRow.appendChild(hashButton);
+  
+  dotGrid.appendChild(specialRow);
   
   // 線描画用のキャンバス
   const canvas = document.createElement('canvas');
@@ -624,11 +703,46 @@ const setupDotGrid = () => {
   // 各ドットにイベントリスナーを設定
   setupDotEventListeners();
   
-  // アクションボタンのイベントリスナーを設定
-  setupActionButtons();
+  // 特殊ボタンのイベントリスナーを設定
+  setupSpecialButtonListeners();
 };
 
-// ドットイベントリスナーの設定
+// デスクトップモード用のワードボタン設定
+const setupDesktopWordButtons = () => {
+  const container = elements.builtinWords;
+  if (!container) return;
+  
+  container.innerHTML = '<h3 title="XXX">Built-In Words</h3>';
+  
+  // 組み込みワードのリストを取得
+  const builtinWords = dictionaryOps.listBuiltinWords().sort();
+  
+  // ワードグループを作成
+  const wordGroup = document.createElement('div');
+  wordGroup.className = 'word-group';
+  
+  // 各組み込みワードのボタンを作成
+  builtinWords.forEach(word => {
+    const wordButton = document.createElement('button');
+    wordButton.className = 'word-button';
+    wordButton.textContent = word;
+    const metadata = dictionaryOps.getMetadata(word);
+    if (metadata && metadata.description) {
+      wordButton.title = metadata.description;
+    }
+    
+    // クリックイベント - ワードを入力エリアに挿入（空白なし）
+    wordButton.addEventListener('click', () => {
+      insertAtCursor(word);
+    });
+    
+    wordGroup.appendChild(wordButton);
+  });
+  
+  container.appendChild(wordGroup);
+};
+
+// ドットイベントリスナーの設定（モバイルモード用）
 const setupDotEventListeners = () => {
   const dots = document.querySelectorAll('.dot');
   
@@ -681,18 +795,23 @@ const setupDotEventListeners = () => {
     endDrawing();
   });
   
-  // ドットの開始処理
+ // ドットの開始処理
   function handleDotStart(dot, e) {
     const digit = dot.dataset.digit;
     const word = dot.dataset.word;
     
     // 数字キーの場合は長押し検出開始
-    if (digit) {
+    if (digit || word) {
       longPressTimer = setTimeout(() => {
-        playPagerTone(digit);
+        if (digit) playPagerTone(digit);
+        
         if (word) {
-          bufferOps.add(word + ' ');
+          bufferOps.add(word);
+        } else if (digit === '0') {
+          // 0の長押しは空白
+          bufferOps.add(' ');
         }
+        
         longPressTimer = null;
       }, 500);
     }
@@ -702,27 +821,61 @@ const setupDotEventListeners = () => {
   }
 };
 
-// アクションボタンの設定
-const setupActionButtons = () => {
-  const clearButton = document.getElementById('clear-buffer');
-  const submitButton = document.getElementById('submit-buffer');
-  
-  if (clearButton) {
+// 特殊ボタンのイベントリスナー設定
+const setupSpecialButtonListeners = () => {
+  // 削除ボタン (*)
+  const deleteButton = document.querySelector('.special-button[data-action="delete"]');
+  if (deleteButton) {
     // ダブルタップで全消去、シングルタップで1文字削除
     let tapCount = 0;
-    clearButton.addEventListener('click', () => {
-      tapCount++;
-      setTimeout(() => {
-        if (tapCount === 1) {
-          bufferOps.backspace();
-        } else if (tapCount >= 2) {
-          bufferOps.clear();
-        }
+    let lastTapTime = 0;
+    
+    deleteButton.addEventListener('click', () => {
+      const now = new Date().getTime();
+      const timeDiff = now - lastTapTime;
+      
+      if (timeDiff < 300) {
+        // ダブルタップ: バッファをクリア
+        bufferOps.clear();
         tapCount = 0;
-      }, 300);
+      } else {
+        // シングルタップ: 末尾の一文字を削除
+        bufferOps.backspace();
+        tapCount = 1;
+      }
+      
+      lastTapTime = now;
     });
   }
   
+  // 空白ボタン (0)
+  const zeroButton = document.querySelector('.dot[data-action="space"]');
+  if (zeroButton) {
+    // 単純クリックで0を入力
+    zeroButton.addEventListener('click', () => {
+      bufferOps.add('0');
+    });
+    
+    // 長押しで空白
+    let longPressTimer;
+    
+    zeroButton.addEventListener('mousedown', () => {
+      longPressTimer = setTimeout(() => {
+        bufferOps.add(' ');
+        longPressTimer = null;
+      }, 500);
+    });
+    
+    zeroButton.addEventListener('mouseup', () => {
+      if (longPressTimer) {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+      }
+    });
+  }
+  
+  // 確定ボタン (#)
+  const submitButton = document.querySelector('.special-button[data-action="submit"]');
   if (submitButton) {
     submitButton.addEventListener('click', () => {
       bufferOps.submit();
@@ -732,8 +885,11 @@ const setupActionButtons = () => {
 
 // なぞり書き開始
 const startDrawing = (dot) => {
-  // 始点がドットでない場合や特殊ドットの場合はスキップ
-  if (!dot || !dot.dataset.value) return;
+  // モバイルモードでない場合は何もしない
+  if (!isMobileDevice()) return;
+  
+  // 始点がドットでない場合や特殊ボタンの場合はスキップ
+  if (!dot || dot.classList.contains('special-button') || !dot.dataset.value) return;
   
   drawState.isActive = true;
   drawState.detectedDots = new Set();
@@ -786,10 +942,9 @@ const detectDot = (e) => {
   const y = point.clientY;
   
   // すべてのドットをチェック
- // すべてのドットをチェック
   document.querySelectorAll('.dot').forEach(dot => {
-    // 特殊ドットまたは既に検出されたドットはスキップ
-    if (dot.classList.contains('special-dot') || drawState.detectedDots.has(dot)) return;
+    // 特殊ボタンまたは既に検出されたドットはスキップ
+    if (dot.classList.contains('special-button') || drawState.detectedDots.has(dot)) return;
     
     const rect = dot.getBoundingClientRect();
     // ポインターがドット上にあるか
@@ -911,7 +1066,7 @@ const insertAtCursor = (text) => {
 const initializeMemoryDisplays = () => {
   // スタック表示領域の初期化
   const stackArea = document.querySelector('.stack-area');
-  if (!stackArea.querySelector('.stack-display')) {
+  if (stackArea && !stackArea.querySelector('.stack-display')) {
     const stackDisplay = document.createElement('div');
     stackDisplay.className = 'stack-display';
     stackArea.appendChild(stackDisplay);
@@ -919,7 +1074,7 @@ const initializeMemoryDisplays = () => {
   
   // レジスタ表示領域の初期化
   const registerArea = document.querySelector('.register-area');
-  if (!registerArea.querySelector('.register-display')) {
+  if (registerArea && !registerArea.querySelector('.register-display')) {
     const registerDisplay = document.createElement('div');
     registerDisplay.className = 'register-display';
     registerArea.appendChild(registerDisplay);
@@ -947,6 +1102,8 @@ const updateUI = () => {
 // スタック表示を更新
 const updateStackDisplay = () => {
   const stackArea = document.querySelector('.stack-area');
+  if (!stackArea) return;
+  
   stackArea.innerHTML = '<h3 title="XXX">Stack</h3>';
   
   // スタック表示エリアを作成
@@ -963,7 +1120,7 @@ const updateStackDisplay = () => {
     // 逆順に表示（最上位が一番下）
     [...state.stack].reverse().forEach((item, index) => {
       const stackItem = document.createElement('div');
-      stackItem.className = 'stack-item';
+      stackItem.className = 'memory-item';
       
       // インデックス（深さ）を表示
       const depth = state.stack.length - index - 1;
@@ -979,6 +1136,8 @@ const updateStackDisplay = () => {
 // レジスタ表示を更新
 const updateRegisterDisplay = () => {
   const registerArea = document.querySelector('.register-area');
+  if (!registerArea) return;
+  
   registerArea.innerHTML = '<h3 title="XXX">Registers</h3>';
   
   // レジスタ表示エリアを作成
@@ -997,7 +1156,7 @@ const updateRegisterDisplay = () => {
   } else {
     keys.forEach(key => {
       const registerItem = document.createElement('div');
-      registerItem.className = 'register-item';
+      registerItem.className = 'memory-item';
       registerItem.textContent = `${key}: ${registers[key].toString()}`;
       registerDisplay.appendChild(registerItem);
     });
@@ -1009,6 +1168,8 @@ const updateRegisterDisplay = () => {
 // カスタムワード表示を更新
 const updateCustomWordsDisplay = () => {
   const customWordsArea = elements.customWords;
+  if (!customWordsArea) return;
+  
   customWordsArea.innerHTML = '<h3 title="XXX">Custom Words</h3>';
   
   // カスタムワードのリストを取得
@@ -1035,7 +1196,7 @@ const updateCustomWordsDisplay = () => {
     
     // クリックイベント - ワードを入力エリアに挿入
     wordButton.addEventListener('click', () => {
-      insertAtCursor(word + ' ');
+      insertAtCursor(word);
     });
     
     wordGroup.appendChild(wordButton);
@@ -1267,9 +1428,15 @@ const initEventListeners = () => {
       executeCode(code);
     }
   });
+  
+  // ウィンドウリサイズ時にモバイル/デスクトップの切り替えを検出
+  window.addEventListener('resize', () => {
+    // レイアウトの再構築
+    setupFunctionsSection();
+  });
 };
 
-// HTML用のスタイル修正
+// HTML用のスタイル修正// HTML用のスタイル修正部分を変更
 const addCSSStyles = () => {
   // 既存のスタイルに追加するスタイル
   const additionalStyles = `
@@ -1281,33 +1448,16 @@ const addCSSStyles = () => {
       border: 1px solid var(--border-color);
       width: 100%;
       box-sizing: border-box;
-    }
-    
-    .stack-display {
       height: 150px;
       overflow-y: auto;
     }
     
-    .register-display {
-      min-height: 60px;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-      gap: 5px;
-    }
-    
-    .stack-item, .register-item {
+    .memory-item {
       padding: 5px;
       margin-bottom: 5px;
       background: rgba(255, 255, 255, 0.5);
       border-radius: 3px;
-    }
-    
-    .stack-item {
       border-left: 3px solid #888;
-    }
-    
-    .register-item {
-      text-align: center;
     }
     
     .empty-message {
@@ -1339,12 +1489,18 @@ const addCSSStyles = () => {
       align-items: center;
     }
     
+    /* Flexboxベースのレイアウト */
     .dot-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 10px;
+      display: flex;
+      flex-direction: column;
       margin-bottom: 15px;
       position: relative;
+    }
+    
+    .dot-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
     }
     
     .dot {
@@ -1353,19 +1509,66 @@ const addCSSStyles = () => {
       border-radius: 50%;
       background-color: #e0e0e0;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      font-weight: bold;
       cursor: pointer;
       position: relative;
+      overflow: hidden;
+    }
+    
+    .dot.numeric {
+      background-color: #ffffff;
+    }
+    
+    .dot .digit {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    
+    .dot .word {
+      font-size: 8px;
+      margin-top: 2px;
+    }
+    
+    .dot .word-only {
+      font-size: 12px;
+      font-weight: bold;
     }
     
     .dot.detected {
       background-color: #ff9999;
     }
     
-    .dot.special-dot {
-      background-color: #ffcc99;
+    .special-row {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 10px;
+    }
+    
+    .special-button {
+      height: 40px;
+      width: 70px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #e0e0e0;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    
+    .special-button.star, .special-button.hash {
+      flex: 1;
+      margin: 0 10px;
+    }
+    
+    .special-row .dot.numeric {
+      background-color: #ffffff;
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      flex: 0 0 auto;
     }
     
     #line-canvas {
@@ -1374,33 +1577,14 @@ const addCSSStyles = () => {
       left: 0;
       pointer-events: none;
       z-index: 10;
-    }
-    
-    .action-buttons {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 10px;
-    }
-    
-    .action-buttons button {
-      flex: 1;
-      padding: 8px;
-      margin: 0 5px;
-      background-color: #f0f0f0;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      cursor: pointer;
+      width: 100%;
+      height: 100%;
     }
     
     @media (max-width: 768px) {
-      .dot-grid {
-        gap: 15px;
-      }
-      
       .dot {
         width: 35px;
         height: 35px;
-        font-size: 12px;
       }
     }
   `;
@@ -1430,8 +1614,8 @@ const init = () => {
   // 組み込みワードの初期化
   initializeBuiltins();
   
-  // ドットグリッドを設定
-  setupDotGrid();
+  // Functions Section の設定（モバイル/デスクトップモードに応じて）
+  setupFunctionsSection();
 
   // イベントリスナーの設定
   initEventListeners();
