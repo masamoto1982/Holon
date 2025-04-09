@@ -786,7 +786,6 @@ const setupDotEventListeners = () => {
 };
 
 // 特殊ボタンのイベントリスナー設定
-// 特殊ボタンのイベントリスナー設定
 const setupSpecialButtonListeners = () => {
   // 削除ボタン (*)
   const deleteButton = document.querySelector('.special-button[data-action="delete"]');
@@ -1418,13 +1417,19 @@ const addCSSStyles = () => {
     /* Memory sections styling */
     .memory-section {
       display: flex;
-      flex-direction: row;
+      flex-direction: column; /* デフォルトで縦並び (デスクトップ向け) */
       gap: 10px;
       margin-bottom: 15px;
     }
     
+    .memory-section > h2 {
+      width: 100%;
+      display: block;
+      margin-bottom: 5px;
+    }
+    
     .stack-area, .register-area {
-      flex: 1;
+      width: 100%; /* 縦並びの場合は幅いっぱいに */
     }
     
     .stack-display, .register-display {
@@ -1455,11 +1460,30 @@ const addCSSStyles = () => {
     /* Mobile layout */
     @media (max-width: 768px) {
       .memory-section {
-        flex-direction: column;
+        flex-direction: row; /* モバイルでは横並びに変更 */
+        flex-wrap: wrap; /* 要素が収まらない場合は折り返し */
+      }
+      
+      .memory-section > h2 {
+        width: 100%;
+        flex-basis: 100%;
+      }
+      
+      .stack-area, .register-area {
+        flex: 1; /* 横並びの場合は均等に幅を分ける */
+        min-width: 0; /* flexboxのバグ対策 */
+        box-sizing: border-box; /* パディングを含めた幅計算 */
+        padding: 0 5px; /* 左右に少しパディングを追加 */
+      }
+      
+      .stack-area h3, .register-area h3 {
+        font-size: 14px; /* 見出しを小さくする */
+        margin: 5px 0;
       }
       
       .stack-display, .register-display {
-        height: 60px;
+        height: 60px; /* モバイルでは高さを小さく */
+        font-size: 12px; /* フォントサイズも小さく */
       }
     }
     
@@ -1521,7 +1545,7 @@ const addCSSStyles = () => {
     
     .special-button {
       height: 40px;
-      width: 110px;
+      width: 70px;
       display: flex;
       align-items: center;
       justify-content: center;
