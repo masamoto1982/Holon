@@ -583,17 +583,22 @@ const setupDotGrid = (isMobile) => {
         
         // ワードドットの位置
         const wordPositions = {
-          7: { word: '+' },
-          13: { word: '/' },
-          17: { word: '-' },
-          6: { word: 'DUP' },
-          11: { word: 'DROP' },
-          16: { word: 'SWAP' },
-          21: { word: 'OVER' },
-          23: { word: 'ROT' },
-          9: { word: 'PRINTLN' },
-          5: { word: 'DEF' },
-          3: { word: 'IF' }
+          1: { word: 'DEF' },
+		  3: { word: 'DEL' },
+		  5: { word: 'DUP' },
+		  6: { word: 'DROP' },
+		  7: { word: 'SWAP' },
+		  8: { word: 'OVER' },
+		  9: { word: 'ROT' },
+		  11: { word: '>R' },
+		  13: { word: 'R>' },
+		  15: { word: 'CLEAR' },
+		  16: { word: '+' },
+		  17: { word: '-' },
+		  18: { word: '*' },
+		  19: { word: '/' },
+		  21: { word: '<' },
+		  23: { word: '=' },
         };
         
         // 数字ドットの場合
@@ -1418,15 +1423,9 @@ const addCSSStyles = () => {
     .memory-section {
       display: flex;
       flex-direction: column; /* デフォルトで縦並び (デスクトップ向け) */
-      gap: 10px;
-      margin-bottom: 15px;
     }
     
-    .memory-section > h2 {
-      width: 100%;
-      display: block;
-      margin-bottom: 5px;
-    }
+   
     
     .stack-area, .register-area {
       width: 100%; /* 縦並びの場合は幅いっぱいに */
@@ -1434,27 +1433,23 @@ const addCSSStyles = () => {
     
     .stack-display, .register-display {
       background: linear-gradient(-45deg, var(--background-dark), var(--background-light));
-      padding: 10px;
+      padding: 0.5em;
       font-family: var(--font-monospace);
       border: 1px solid var(--border-color);
       width: 100%;
-      box-sizing: border-box;
       height: 80px;
-      overflow-x: auto;
       white-space: nowrap;
     }
     
     .memory-content {
       display: inline-block;
       text-align: left;
-      padding: 5px;
     }
     
     .empty-message {
       color: var(--text-color-gray);
-      text-align: center;
-      font-style: italic;
-      padding: 10px;
+      text-align: reft;
+      padding: 5px;
     }
     
     /* Mobile layout */
@@ -1471,9 +1466,6 @@ const addCSSStyles = () => {
       
       .stack-area, .register-area {
         flex: 1; /* 横並びの場合は均等に幅を分ける */
-        min-width: 0; /* flexboxのバグ対策 */
-        box-sizing: border-box; /* パディングを含めた幅計算 */
-        padding: 0 5px; /* 左右に少しパディングを追加 */
       }
       
       .stack-area h3, .register-area h3 {
@@ -1481,10 +1473,7 @@ const addCSSStyles = () => {
         margin: 5px 0;
       }
       
-      .stack-display, .register-display {
-        height: 60px; /* モバイルでは高さを小さく */
-        font-size: 12px; /* フォントサイズも小さく */
-      }
+      
     }
     
     /* Flexbox layout for dot grid */
@@ -1545,7 +1534,7 @@ const addCSSStyles = () => {
     
     .special-button {
       height: 40px;
-      width: 70px;
+      width: 120px;
       display: flex;
       align-items: center;
       justify-content: center;
