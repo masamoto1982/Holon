@@ -1,17 +1,81 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>holon</title>
     <style>
-        /* Apply border-box sizing globally */
-        *,
-        *::before,
-        *::after {
+        /* CSS変数の定義 */
+        :root {
+            /* カラーパレット */
+            --color-primary: #3b82f6;
+            --color-primary-dark: #2563eb;
+            --color-primary-darker: #1d4ed8;
+            --color-secondary: #f0f0f0;
+            --color-background: #ffffff;
+            --color-border: #a0a0a0;
+            --color-text: #333333;
+            --color-text-light: #666666;
+            
+            /* アクセントカラー */
+            --color-success: #d1fae5;
+            --color-success-dark: #10b981;
+            --color-error: #fee2e2;
+            --color-error-dark: #ef4444;
+            --color-info: #dbeafe;
+            --color-info-dark: #3b82f6;
+            --color-warning: #fde68a;
+            
+            /* レイアウト */
+            --spacing-xs: 4px;
+            --spacing-sm: 8px;
+            --spacing-md: 10px;
+            --spacing-lg: 16px;
+            --spacing-xl: 24px;
+            
+            /* ボーダー */
+            --border-radius-sm: 4px;
+            --border-radius-md: 8px;
+            --border-radius-lg: 12px;
+            --border-radius-circle: 50%;
+            
+            /* フォント */
+            --font-size-xs: 10px;
+            --font-size-sm: 12px;
+            --font-size-md: 14px;
+            --font-size-lg: 16px;
+            --font-size-xl: 18px;
+            
+            /* アニメーション */
+            --transition-fast: 0.1s;
+            --transition-normal: 0.2s;
+            --transition-slow: 0.3s;
+            
+            /* レイアウト固定値 */
+            --dot-size: 45px;
+            --dot-gap: 10px;
+            --max-width: 400px;
+        }
+        
+        /* ダークモード対応 (prefers-color-scheme) */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-secondary: #1f2937;
+                --color-background: #111827;
+                --color-border: #374151;
+                --color-text: #f3f4f6;
+                --color-text-light: #d1d5db;
+                
+                --color-success: #065f46;
+                --color-error: #991b1b;
+                --color-info: #1e40af;
+                --color-warning: #92400e;
+            }
+        }
+
+        /* グローバルスタイル */
+        *, *::before, *::after {
             box-sizing: border-box;
-            /* Reset default margin/padding for consistency (optional but good practice) */
             margin: 0;
             padding: 0;
         }
@@ -20,197 +84,252 @@
             overscroll-behavior: none;
             touch-action: none;
             text-align: center;
-            padding: 1rem;
-            /* Add some padding to body */
-            background-color: #f0f0f0;
-            /* Light background for contrast */
+            padding: var(--spacing-lg);
+            background-color: var(--color-secondary);
+            color: var(--color-text);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
         }
 
         article {
             width: 100%;
-            max-width: 400px;
-            border: 2px dotted #a0a0a0;
+            max-width: var(--max-width);
+            border: 2px dotted var(--color-border);
             display: inline-block;
-            /* To respect text-align: center on body */
-            background-color: white;
-            /* Give article a background */
-            padding: 10px;
-            /* Add padding inside the article */
+            background-color: var(--color-background);
+            padding: var(--spacing-md);
             text-align: left;
-            /* Reset text-align for content */
+            border-radius: var(--border-radius-sm);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
-        h1,
-        h2 {
+        h1, h2 {
             text-align: center;
-            /* Center headings */
-            margin-bottom: 0.5rem;
-            /* Space below headings */
-            margin-top: 0.5rem;
+            margin-bottom: var(--spacing-md);
+            margin-top: var(--spacing-md);
+            color: var(--color-text);
         }
-
+        
         h1 {
             margin-top: 0;
+            font-size: var(--font-size-xl);
+        }
+        
+        h2 {
+            font-size: var(--font-size-lg);
         }
 
         section {
-            border: 2px dotted #a0a0a0;
-            padding: 10px;
-            /* Use padding for inner spacing */
-            margin-bottom: 10px;
-            /* Space between sections */
-            /* width: 100%; Removed - block element takes width automatically */
+            border: 2px dotted var(--color-border);
+            padding: var(--spacing-md);
+            margin-bottom: var(--spacing-md);
+            border-radius: var(--border-radius-sm);
         }
-
-        /* Remove margin for the last section */
+        
         section:last-child {
             margin-bottom: 0;
+        }
+
+        /* タブ切り替え用スタイル */
+        .tab-container {
+            margin-bottom: var(--spacing-md);
+        }
+
+        .tab-buttons {
+            display: flex;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .tab-button {
+            padding: var(--spacing-sm) var(--spacing-lg);
+            background-color: var(--color-secondary);
+            border: 1px solid var(--color-border);
+            border-bottom: none;
+            border-radius: var(--border-radius-sm) var(--border-radius-sm) 0 0;
+            margin-right: var(--spacing-xs);
+            cursor: pointer;
+            transition: background-color var(--transition-fast);
+            color: var(--color-text);
+        }
+
+        .tab-button.active {
+            background-color: var(--color-background);
+            border-bottom: 1px solid var(--color-background);
+            margin-bottom: -1px;
+            font-weight: bold;
+        }
+
+        .tab-content {
+            display: none;
+            padding: var(--spacing-lg) var(--spacing-md);
+            border: 1px solid var(--color-border);
+            border-top: none;
+            background-color: var(--color-background);
+            border-radius: 0 0 var(--border-radius-sm) var(--border-radius-sm);
+        }
+
+        .tab-content.active {
+            display: block;
         }
 
         /* Style for textarea and input */
         #output,
         #text-input {
             width: 100%;
-            /* Fill the section's content width */
-            padding: 8px;
-            /* Internal padding */
-            /* margin: 5px; Removed - use section padding */
-            border: 1px solid #ccc;
-            /* Add border */
-            border-radius: 4px;
-            /* Slightly rounded corners */
+            padding: var(--spacing-sm);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-sm);
             display: block;
-            /* Ensure they take full width */
-            margin-top: 5px;
-            /* Space below h2 */
+            margin-top: var(--spacing-xs);
+            font-family: 'Courier New', Courier, monospace;
+            font-size: var(--font-size-md);
+            color: var(--color-text);
         }
-
+        
         #output {
             resize: vertical;
-            /* Allow vertical resize */
             min-height: 80px;
-            /* Give it some initial height */
             max-height: 300px;
-            /* 最大高さを設定 */
-            background-color: #f8f8f8;
-            /* Light background for readonly */
-            transition: background-color 0.3s;
+            background-color: var(--color-secondary);
+            transition: background-color var(--transition-slow);
             overflow-y: auto;
-            /* スクロールバーを表示 */
         }
-
+        
+        #text-input {
+            background-color: var(--color-background);
+        }
+        
         #output.executed {
-            background-color: #d1fae5;
-            transition: background-color 0.3s;
+            background-color: var(--color-success);
+            transition: background-color var(--transition-slow);
+            color: var(--color-text-dark, var(--color-text));
         }
 
+        /* Execute Button Style */
+        #execute-button {
+            display: block;
+            width: 100%;
+            padding: var(--spacing-md);
+            margin-top: var(--spacing-md);
+            background-color: var(--color-primary);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius-sm);
+            font-size: var(--font-size-lg);
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color var(--transition-normal);
+        }
+        
+        #execute-button:hover {
+            background-color: var(--color-primary-dark);
+        }
+        
+        #execute-button:active {
+            background-color: var(--color-primary-darker);
+        }
+
+        /* d2d input styling */
         #d2d-input {
             position: relative;
             user-select: none;
-            margin-top: 5px;
-            /* Space below h2 */
-            /* Padding is inherited from section */
+            margin-top: var(--spacing-xs);
         }
-
+        
         #dot-grid {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            margin-bottom: 10px;
-            /* Center the grid horizontally if needed, though rows center dots */
+            gap: var(--dot-gap);
+            margin-bottom: var(--spacing-md);
             align-items: center;
         }
-
+        
         .dot-row {
             display: flex;
             justify-content: center;
-            gap: 10px;
+            gap: var(--dot-gap);
         }
-
+        
         .dot {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            border: 1px solid #ccc;
-            background-color: #f8f8f8;
+            width: var(--dot-size);
+            height: var(--dot-size);
+            border-radius: var(--border-radius-circle);
+            border: 1px solid var(--color-border);
+            background-color: var(--color-secondary);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
+            font-size: var(--font-size-xs);
             font-weight: bold;
-            color: #aaa;
+            color: var(--color-text-light);
             cursor: pointer;
             position: relative;
-            transition: background-color 0.1s;
-            /* box-sizing: border-box; Applied globally */
+            transition: background-color var(--transition-fast);
             flex-shrink: 0;
         }
-
+        
         .dot.numeric {
-            background-color: #fee2e2;
-            color: #ef4444;
-            font-size: 16px;
+            background-color: var(--color-error);
+            color: white;
+            font-size: var(--font-size-lg);
         }
-
+        
         .dot.word-dot {
-            background-color: #dbeafe;
-            color: #3b82f6;
-            font-size: 12px;
+            background-color: var(--color-info);
+            color: white;
+            font-size: var(--font-size-sm);
             overflow: hidden;
             text-align: center;
             line-height: 1.2;
         }
-
+        
         .dot.detected {
-            background-color: #fca5a5;
-            border-color: #ef4444;
+            background-color: var(--color-error-dark);
+            border-color: var(--color-error-dark);
+            color: white;
         }
-
+        
         #special-row {
             display: flex;
             justify-content: center;
-            gap: 10px;
-            margin-top: 10px;
+            gap: var(--dot-gap);
+            margin-top: var(--spacing-md);
         }
-
+        
         .special-button {
             width: 60px;
-            height: 45px;
-            border-radius: 10px;
-            border: 1px solid #ccc;
+            height: var(--dot-size);
+            border-radius: var(--border-radius-md);
+            border: 1px solid var(--color-border);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            font-size: var(--font-size-xl);
             font-weight: bold;
             cursor: pointer;
-            background-color: #e5e7eb;
+            background-color: var(--color-secondary);
             flex-shrink: 0;
-            transition: transform 0.1s, background-color 0.1s;
+            transition: transform var(--transition-fast), background-color var(--transition-fast);
+            color: var(--color-text);
         }
-
-        .special-button.delete {
-            background-color: #f8f8f8;
+        
+        .special-button.delete, .special-button.space {
+            background-color: var(--color-secondary);
         }
-
-        .special-button.space {
-            background-color: #f8f8f8;
-        }
-
+        
         .special-button.long-pressed {
-            background-color: #fde68a;
+            background-color: var(--color-warning);
             transform: scale(0.95);
         }
-
+        
         .special-button.combined-pressed {
-            background-color: #93c5fd;
+            background-color: var(--color-info);
             transform: scale(0.95);
         }
-
+        
         #special-row .dot.numeric {
             flex-shrink: 0;
         }
-
+        
         #line-canvas {
             position: absolute;
             top: 0;
@@ -221,77 +340,57 @@
             z-index: 10;
         }
 
-        /* Execute Button Style */
-        #execute-button {
-            display: block;
-            width: 100%;
-            padding: 10px;
-            margin-top: 10px;
-            background-color: #3b82f6;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-
-        #execute-button:hover {
-            background-color: #2563eb;
-        }
-
-        #execute-button:active {
-            background-color: #1d4ed8;
-        }
-
         /* Debug Panel Styles */
         #debug-panel {
-            margin-top: 20px;
-            padding: 10px;
-            background-color: #f8fafc;
-            border: 1px solid #cbd5e1;
-            border-radius: 5px;
+            margin-top: var(--spacing-xl);
+            padding: var(--spacing-md);
+            background-color: var(--color-secondary);
+            border: 1px solid var(--color-border);
+            border-radius: var(--border-radius-sm);
         }
-
+        
         .control-container {
             display: flex;
             align-items: center;
-            margin: 8px 0;
+            margin: var(--spacing-sm) 0;
         }
-
+        
         .control-container label {
             min-width: 120px;
+            color: var(--color-text);
         }
-
+        
         .control-container input[type="range"] {
             flex-grow: 1;
-            margin: 0 10px;
+            margin: 0 var(--spacing-md);
+            accent-color: var(--color-primary);
         }
-
+        
         .value-display {
             min-width: 40px;
             text-align: right;
+            color: var(--color-text);
         }
-
+        
         .debug-output {
-            margin-top: 10px;
-            padding: 10px;
-            background-color: #f1f5f9;
-            border-radius: 4px;
+            margin-top: var(--spacing-md);
+            padding: var(--spacing-md);
+            background-color: var(--color-secondary);
+            border-radius: var(--border-radius-sm);
             max-height: 150px;
             overflow-y: auto;
             font-family: monospace;
-            font-size: 12px;
+            font-size: var(--font-size-sm);
+            color: var(--color-text);
         }
-
+        
         .recognition-feedback {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             background-color: rgba(255, 255, 255, 0.9);
-            border-radius: 50%;
+            border-radius: var(--border-radius-circle);
             width: 80px;
             height: 80px;
             display: flex;
@@ -299,49 +398,66 @@
             justify-content: center;
             font-size: 32px;
             font-weight: bold;
-            color: #3b82f6;
+            color: var(--color-info-dark);
             animation: fadeOut 0.8s ease-out forwards;
             pointer-events: none;
         }
-
+        
         @keyframes fadeOut {
-            0% {
-                opacity: 1;
-            }
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
 
-            70% {
-                opacity: 1;
+        /* レスポンシブデザイン */
+        @media (max-width: 600px) {
+            :root {
+                --dot-size: 40px;
+                --dot-gap: 8px;
             }
-
-            100% {
-                opacity: 0;
+            
+            body {
+                padding: var(--spacing-sm);
+            }
+            
+            article {
+                padding: var(--spacing-sm);
+            }
+            
+            #execute-button {
+                padding: var(--spacing-sm);
+            }
+            
+            .special-button {
+                width: 50px;
             }
         }
     </style>
 </head>
+<body> <article>
+        <h1>holon Ver.202504152327</h1>
 
-<body>
-    <article>
-        <h1>holon Ver.202504150806</h1>
-
-        <section>
-            <h2>output</h2>
-            <textarea id="output" readonly></textarea>
-        </section>
-
-        <section>
-            <h2>txt-input</h2>
-            <input type="text" id="text-input" placeholder="Enter holon code...">
-            <button id="execute-button">実行</button>
+        <section class="tab-container">
+            <div class="tab-buttons">
+                <div class="tab-button active" data-tab="output-tab">output</div>
+                <div class="tab-button" data-tab="input-tab">txt-input</div>
+            </div>
+            <div class="tab-content active" id="output-tab">
+                <textarea id="output" readonly></textarea>
+            </div>
+            <div class="tab-content" id="input-tab">
+                <input type="text" id="text-input" placeholder="Enter holon code...">
+                <button id="execute-button">実行</button>
+            </div>
         </section>
 
         <section>
             <h2>d2d-input</h2>
             <div id="d2d-input">
                 <div id="dot-grid">
-                </div>
+                    </div>
                 <div id="special-row">
-                </div>
+                    </div>
                 <canvas id="line-canvas"></canvas>
             </div>
         </section>
@@ -352,21 +468,21 @@
         const CONFIG = {
             // デバッグモード
             debug: true,
-
+            
             // ドット感度パラメータ
             sensitivity: {
                 hitRadius: 22,         // ドットの当たり判定の半径（ピクセル）
                 minSwipeDistance: 5,   // なぞり書きと認識する最小距離
                 debounceTime: 50,      // ドット検出の間隔（ミリ秒）
             },
-
+            
             // 時間パラメータ
             timing: {
                 multiStrokeTimeout: 700,  // 複数ストロークを同一ジェスチャーと認識する時間（ミリ秒）
                 longPressDuration: 500,   // 長押しと認識する時間（ミリ秒）
                 strokeCooldown: 100,      // 同じドットの再検出を防ぐクールダウン時間
             },
-
+            
             // レイアウトパラメータ
             layout: {
                 dotSize: 45,           // ドットのサイズ（ピクセル）
@@ -374,7 +490,7 @@
                 gridRows: 5,           // グリッドの行数
                 gridCols: 5,           // グリッドの列数
             },
-
+            
             // 視覚的フィードバックパラメータ
             visual: {
                 lineWidth: 3,          // ストロークの線の太さ
@@ -394,7 +510,7 @@
                     throw new Error("Division by zero: Denominator cannot be zero.");
                 }
                 if (!Number.isInteger(numerator) || !Number.isInteger(denominator)) {
-                    console.warn("Fraction created with non-integer values. Consider using integers for precision.");
+                     console.warn("Fraction created with non-integer values. Consider using integers for precision.");
                 }
                 const commonDivisor = this.gcd(Math.abs(numerator), Math.abs(denominator));
                 const sign = (denominator < 0) ? -1 : 1;
@@ -415,20 +531,20 @@
                 return new Fraction(newNumerator, newDenominator);
             }
             subtract(other) {
-                if (!(other instanceof Fraction)) throw new Error("Can only subtract Fraction objects.");
+                 if (!(other instanceof Fraction)) throw new Error("Can only subtract Fraction objects.");
                 const newNumerator = this.numerator * other.denominator - other.numerator * this.denominator;
                 const newDenominator = this.denominator * other.denominator;
                 return new Fraction(newNumerator, newDenominator);
             }
             multiply(other) {
-                if (!(other instanceof Fraction)) throw new Error("Can only multiply Fraction objects.");
+                 if (!(other instanceof Fraction)) throw new Error("Can only multiply Fraction objects.");
                 const newNumerator = this.numerator * other.numerator;
                 const newDenominator = this.denominator * other.denominator;
                 return new Fraction(newNumerator, newDenominator);
             }
             divide(other) {
-                if (!(other instanceof Fraction)) throw new Error("Can only divide Fraction objects.");
-                if (other.numerator === 0) throw new Error("Division by zero: Cannot divide by a zero fraction.");
+                 if (!(other instanceof Fraction)) throw new Error("Can only divide Fraction objects.");
+                 if (other.numerator === 0) throw new Error("Division by zero: Cannot divide by a zero fraction.");
                 const newNumerator = this.numerator * other.denominator;
                 const newDenominator = this.denominator * other.numerator;
                 return new Fraction(newNumerator, newDenominator);
@@ -438,13 +554,13 @@
                 return this.numerator === other.numerator && this.denominator === other.denominator;
             }
             lessThan(other) {
+                 if (!(other instanceof Fraction)) throw new Error("Can only compare Fraction objects.");
+                 return this.numerator * other.denominator < other.numerator * this.denominator;
+           }
+             greaterThan(other) {
                 if (!(other instanceof Fraction)) throw new Error("Can only compare Fraction objects.");
-                return this.numerator * other.denominator < other.numerator * this.denominator;
-            }
-            greaterThan(other) {
-                if (!(other instanceof Fraction)) throw new Error("Can only compare Fraction objects.");
-                return this.numerator * other.denominator > other.numerator * this.denominator;
-            }
+               return this.numerator * other.denominator > other.numerator * this.denominator;
+           }
             toString() {
                 return this.denominator === 1 ? `${this.numerator}` : `${this.numerator}/${this.denominator}`;
             }
@@ -477,7 +593,7 @@
                 FILTER: (array, fn) => array.filter(fn),
                 REDUCE: (array, fn, initial) => array.reduce(fn, initial)
             },
-
+            
             parse: (code) => {
                 // 簡易パーサー
                 try {
@@ -485,21 +601,21 @@
                     const lines = code.split('\n')
                         .map(line => line.trim())
                         .filter(line => line && !line.startsWith('//'));
-
+                    
                     let result = null;
-
+                    
                     // 非常に単純な実装
                     return "パース完了";
                 } catch (error) {
                     throw new Error(`パースエラー: ${error.message}`);
                 }
             },
-
+            
             execute: (code) => {
                 try {
                     // デバッグ用に出力
                     console.log("実行コード:", code);
-
+                    
                     // FizzBuzzのケースを検出し、数値を抽出
                     if (code.includes("FIZZBUZZ")) {
                         // 数値を抽出 (デフォルトは20)
@@ -510,7 +626,7 @@
                             // 数値が大きすぎる場合は制限する
                             if (maxNum > 1000) maxNum = 1000;
                         }
-
+                        
                         // 実際にFizzBuzzを計算
                         const result = [];
                         for (let i = 1; i <= maxNum; i++) {
@@ -524,10 +640,10 @@
                                 result.push(i.toString());
                             }
                         }
-
+                        
                         return result.join(", ");
                     }
-
+                    
                     // 単純なテスト実装
                     if (code.includes("PRINT")) {
                         // PRINT関数の引数を抽出する簡易的な方法
@@ -536,12 +652,12 @@
                             return match[1]; // 引用符の中の内容を返す
                         }
                     }
-
+                    
                     // 単純な変数定義や計算のテスト
                     if (code.includes("=>")) {
                         return "変数または関数を定義しました";
                     }
-
+                    
                     return "実行完了 (テストモード)";
                 } catch (error) {
                     return `エラー: ${error.message}`;
@@ -563,10 +679,10 @@
         };
         const numericPositions = { 0: '1', 2: '2', 4: '3', 10: '4', 12: '5', 14: '6', 20: '7', 22: '8', 24: '9' };
         const dotWordMapping = { 128: '+', 131072: '-', 2048: '*', 8192: '/' };
-
+        
         // 特殊変数のドット割り当て（i, j, x, y）
         const specialVarMapping = { 7: 'i', 9: 'j', 17: 'x', 19: 'y' };
-
+        
         // マージしてdotWordMappingに追加
         Object.keys(specialVarMapping).forEach(key => {
             dotWordMapping[dotValues[key]] = specialVarMapping[key];
@@ -580,9 +696,11 @@
             input: document.getElementById('text-input'),
             d2dArea: document.getElementById('d2d-input'),
             output: document.getElementById('output'),
-            executeButton: document.getElementById('execute-button')
+            executeButton: document.getElementById('execute-button'),
+            tabButtons: document.querySelectorAll('.tab-button'),
+            tabContents: document.querySelectorAll('.tab-content')
         };
-        const lineCtx = elements.lineCanvas.getContext('2d');
+        const lineCtx = elements.lineCanvas ? elements.lineCanvas.getContext('2d') : null;
 
         // --- Gesture State (Mutable) ---
         const drawState = {
@@ -636,675 +754,745 @@
         };
 
         // --- Canvas Drawing Functions ---
-        // Arrow function for conciseness
-        const clearCanvas = () => {
-            lineCtx && elements.lineCanvas && lineCtx.clearRect(0, 0, elements.lineCanvas.width, elements.lineCanvas.height);
+        // 赤線描画を無効化し、ドットの色変化だけを維持
+        const updateCanvas = () => {
+            // 線の描画を行わない（ドットの色変化のみで十分）
+            // ドットの色変化はaddDetectedDotで処理されるため、このメソッドは空でOK
+            return;
         };
 
-        // Arrow function; kept block scope for clarity due to multiple steps
-        const updateCanvas = () => {
-            const canvas = elements.lineCanvas;
-            const ctx = lineCtx;
-            const grid = elements.dotGrid;
-            if (!grid || !canvas) return;
-            const gridRect = grid.getBoundingClientRect();
-
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const numericDotsToConnect = [];
-            drawState.detectedDots.forEach(dot => {
-                dot.classList.contains('numeric') && numericDotsToConnect.push(dot); // Use short-circuit
-            });
-
-            if (numericDotsToConnect.length < 1) return;
-
-            ctx.beginPath();
-            ctx.strokeStyle = CONFIG.visual.lineColor;
-            ctx.lineWidth = CONFIG.visual.lineWidth;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
-            let isFirstNumeric = true;
-            numericDotsToConnect.forEach(dot => {
-                const dotRect = dot.getBoundingClientRect();
-                const x = (dotRect.left - gridRect.left) + (dotRect.width / 2);
-                const y = (dotRect.top - gridRect.top) + (dotRect.height / 2);
-                isFirstNumeric ? ctx.moveTo(x, y) : ctx.lineTo(x, y); // Use ternary
-                isFirstNumeric = false;
-            });
-
-            !isFirstNumeric && ctx.stroke(); // Use short-circuit
+        // キャンバスのクリーン処理も空に
+        const clearCanvas = () => {
+            return; // 何もしない
         };
 
         // --- Gesture Logic Functions ---
         // Arrow function for conciseness
         const resetDrawState = (keepActive = false) => {
-            drawState.isActive = keepActive;
-            drawState.detectedDots.forEach(dot => dot.classList.remove('detected'));
-            drawState.detectedDots.clear();
-            drawState.totalValue = 0;
-            drawState.isLongPress = false;
-            drawState.currentStrokeDetected = false;
-            !keepActive && (drawState.lastStrokeTime = 0); // Short-circuit assignment
-            drawState.longPressTimer && clearTimeout(drawState.longPressTimer); // Short-circuit clear
-            drawState.longPressTimer = null;
-            drawState.strokeTimer && clearTimeout(drawState.strokeTimer);
-            drawState.strokeTimer = null;
-        };
-
-        // Arrow function; using short-circuit return
-        const recognizeLetter = (totalValue) => {
-            const recognized = letterPatterns[totalValue] || null;
-            if (recognized && CONFIG.debug) {
-                debugLog(`認識: 値=${totalValue}, 文字=${recognized}`);
-            } else if (CONFIG.debug) {
-                debugLog(`認識失敗: 値=${totalValue}`);
-            }
-            return recognized;
-        };
-
-        // Arrow function; kept block scope for clarity (setTimeout logic)
-        const endDrawing = () => {
-            if (!drawState.isActive) return;
-
-            const now = Date.now();
-            drawState.lastStrokeTime = now;
-
-            // 現在のストロークで何かドットを検出した場合のみ処理を続行
-            if (drawState.currentStrokeDetected) {
-                drawState.currentStrokeDetected = false;
-
-                // タイムアウト後に文字認識を試みる
-                drawState.strokeTimer = setTimeout(() => {
-                    const elapsed = Date.now() - drawState.lastStrokeTime;
-                    if (elapsed >= CONFIG.timing.multiStrokeTimeout - 50) {
-                        if (drawState.detectedDots.size > 0 && drawState.totalValue > 0) {
-                            const recognized = recognizeLetter(drawState.totalValue);
-                            if (recognized) {
-                                insertAtCursor(recognized);
-                                // 成功を視覚的に示す一時的なフィードバック
-                                const feedbackEl = document.createElement('div');
-                                feedbackEl.className = 'recognition-feedback';
-                                feedbackEl.textContent = recognized;
-                                elements.d2dArea.appendChild(feedbackEl);
-                                setTimeout(() => feedbackEl.remove(), 800);
-                            }
-                        }
-                        resetDrawState();
-                        clearCanvas();
-                    }
-                }, CONFIG.timing.multiStrokeTimeout);
-            }
-        };
-
-        // Arrow function for conciseness
-        const addDetectedDot = (dotElement) => {
-            if (!dotElement || drawState.detectedDots.has(dotElement)) return;
-            dotElement.classList.add('detected');
-            drawState.detectedDots.add(dotElement);
-            drawState.currentStrokeDetected = true;
-            const value = parseInt(dotElement.dataset.value, 10);
-            !isNaN(value) && (drawState.totalValue += value); // Short-circuit addition
-
-            if (CONFIG.debug) {
-                debugLog(`ドット検出: index=${dotElement.dataset.index}, value=${value}, total=${drawState.totalValue}`);
-            }
-        };
-
-        // Arrow function; kept block scope for clarity (loop)
-        const detectDot = (clientX, clientY) => {
-            if (!drawState.isActive) return;
-
-            // 前回の検出から最小間隔が経過していない場合はスキップ
-            const now = Date.now();
-            if (now - drawState.lastDetectionTime < CONFIG.sensitivity.debounceTime) return;
-            drawState.lastDetectionTime = now;
-
-            const dots = document.querySelectorAll('#dot-grid .dot');
-            let detected = false;
-
-            dots.forEach(dot => {
-                if (drawState.detectedDots.has(dot)) return;
-
-                const rect = dot.getBoundingClientRect();
-                const centerX = rect.left + rect.width / 2;
-                const centerY = rect.top + rect.height / 2;
-
-                // 中心からの距離に基づいて判定（円形の当たり判定）
-                const distance = Math.sqrt(
-                    Math.pow(clientX - centerX, 2) +
-                    Math.pow(clientY - centerY, 2)
-                );
-
-                // 設定した半径内にある場合のみ検出
-                if (distance <= CONFIG.sensitivity.hitRadius) {
-                    addDetectedDot(dot);
-                    detected = true;
-                }
-            });
-
-            detected && updateCanvas();
-        };
-
-        // Arrow function; kept block scope for clarity
-        const startDrawing = (dotElement, startX, startY) => {
-            if (!dotElement || !dotElement.classList.contains('dot') || !dotElement.closest('#dot-grid')) return;
-            const now = Date.now();
-            (!drawState.isActive || now - drawState.lastStrokeTime > CONFIG.timing.multiStrokeTimeout) && resetDrawState(true); // Short-circuit reset
-            drawState.isActive = true;
-            drawState.startX = startX;
-            drawState.startY = startY;
-            drawState.lastDetectionTime = now;
-            addDetectedDot(dotElement);
-            updateCanvas();
-        };
-
-        // --- Event Handlers ---
-        // 削除アクション拡張
-        const handleDeleteAction = (deleteToken = false) => {
-            const textarea = elements.input;
-            const cursorPos = textarea.selectionStart;
-
-            if (cursorPos > 0) {
-                if (deleteToken) {
-                    // トークン（単語）削除モード
-                    // 直前の空白文字まで削除
-                    let textBefore = textarea.value.substring(0, cursorPos);
-                    const textAfter = textarea.value.substring(cursorPos);
-
-                    // 最後の空白を見つける
-                    const lastSpaceIndex = textBefore.lastIndexOf(' ');
-
-                    if (lastSpaceIndex >= 0) {
-                        // 空白を残す形で削除
-                        textBefore = textBefore.substring(0, lastSpaceIndex + 1);
-                    } else {
-                        // 空白がない場合は全削除
-                        textBefore = '';
-                    }
-
-                    textarea.value = textBefore + textAfter;
-                    textarea.selectionStart = textarea.selectionEnd = textBefore.length;
-                } else {
-                    // 一文字削除
-                    const textBefore = textarea.value.substring(0, cursorPos - 1);
-                    const textAfter = textarea.value.substring(cursorPos);
-                    textarea.value = textBefore + textAfter;
-                    textarea.selectionStart = textarea.selectionEnd = cursorPos - 1;
-                }
-            }
-            textarea.focus();
-        };
-
-        // クリックタイプを判定して適切な関数を実行
-        const handleSpecialButtonClick = (e, buttonType, actions) => {
-            e.preventDefault();
-
-            const now = Date.now();
-
-            if (specialButtonState.clickTarget === buttonType &&
-                now - specialButtonState.lastClickTime < specialButtonState.doubleClickDelay) {
-                // ダブルクリック検出
-                clearTimeout(specialButtonState.clickTimer);
-                specialButtonState.clickCount = 0;
-                specialButtonState.clickTarget = null;
-                actions.double();
-
-                if (CONFIG.debug) {
-                    debugLog(`ダブルクリック: ${buttonType}`);
-                }
-            } else {
-                // シングルクリックの可能性
-                specialButtonState.clickCount = 1;
-                specialButtonState.lastClickTime = now;
-                specialButtonState.clickTarget = buttonType;
-
-                // シングルクリック判定のタイマー
-                specialButtonState.clickTimer = setTimeout(() => {
-                    if (specialButtonState.clickCount === 1) {
-                        actions.single();
-                        if (CONFIG.debug) {
-                            debugLog(`シングルクリック: ${buttonType}`);
-                        }
-                    }
-                    specialButtonState.clickCount = 0;
-                    specialButtonState.clickTarget = null;
-                }, specialButtonState.doubleClickDelay);
-            }
-        };
-
-        // 長押し検出
-        const handleSpecialButtonLongPress = (e, button, action) => {
-            e.preventDefault();
-
-            const longPressTimer = setTimeout(() => {
-                action();
-                button.classList.add('long-pressed');
-
-                if (CONFIG.debug) {
-                    debugLog(`長押し: ${button.dataset.action || button.dataset.digit}`);
-                }
-
-                setTimeout(() => button.classList.remove('long-pressed'), 200);
-            }, CONFIG.timing.longPressDuration);
-
-            // ポインターアップでタイマーをクリア
-            const clearTimer = () => {
-                clearTimeout(longPressTimer);
-                button.removeEventListener('pointerup', clearTimer);
-                button.removeEventListener('pointercancel', clearTimer);
-                button.removeEventListener('pointerleave', clearTimer);
-            };
-
-            button.addEventListener('pointerup', clearTimer);
-            button.addEventListener('pointercancel', clearTimer);
-            button.addEventListener('pointerleave', clearTimer);
-        };
-
-        // コード実行機能
-        const executeCode = () => {
-            const code = elements.input.value;
-            if (!code.trim()) return;
-
-            try {
-                // holonコードを実行
-                const result = holonInterpreter.execute(code);
-
-                // 結果を出力エリアに表示
-                elements.output.value = result !== undefined ? result : "実行完了";
-
-                // 視覚的フィードバック
-                elements.output.classList.add('executed');
-                setTimeout(() => elements.output.classList.remove('executed'), 300);
-
-                // 実行成功時のみ入力欄をクリア
-                if (!result.startsWith("エラー:")) {
-                    elements.input.value = "";
-                }
-
-                if (CONFIG.debug) {
-                    debugLog(`コード実行: ${code.substring(0, 20)}${code.length > 20 ? '...' : ''}`);
-                }
-            } catch (error) {
-                elements.output.value = `エラー: ${error.message}`;
-                if (CONFIG.debug) {
-                    debugLog(`実行エラー: ${error.message}`);
-                }
-            }
-        };
-
-        // --- * + # の同時押し検出
-        const setupCombinedButtonPress = (deleteBtn, spaceBtn) => {
-            if (!deleteBtn || !spaceBtn) return;
-
-            const combinedState = {
-                deletePressed: false,
-                spacePressed: false,
-                pressStartTime: 0,
-                maxTimeDiff: 300 // ミリ秒、同時押しと認識する最大時間差
-            };
-
-            // * ボタンのイベント
-            deleteBtn.addEventListener('pointerdown', () => {
-                combinedState.deletePressed = true;
-                combinedState.pressStartTime = Date.now();
-                checkCombinedPress();
-            });
-
-            deleteBtn.addEventListener('pointerup', () => {
-                combinedState.deletePressed = false;
-            });
-
-            // # ボタンのイベント
-            spaceBtn.addEventListener('pointerdown', () => {
-                combinedState.spacePressed = true;
-                combinedState.pressStartTime = Date.now();
-                checkCombinedPress();
-            });
-
-            spaceBtn.addEventListener('pointerup', () => {
-                combinedState.spacePressed = false;
-            });
-
-            // 同時押し検出
-            const checkCombinedPress = () => {
-                if (combinedState.deletePressed && combinedState.spacePressed) {
-                    // 両方のボタンが押されている場合、実行機能を起動
-                    executeCode();
-
-                    // 視覚的フィードバック
-                    deleteBtn.classList.add('combined-pressed');
-                    spaceBtn.classList.add('combined-pressed');
-
-                    setTimeout(() => {
-                        deleteBtn.classList.remove('combined-pressed');
-                        spaceBtn.classList.remove('combined-pressed');
-                    }, 200);
-                }
-            };
-        };
-
-        // キーボードの同時押し検出
-        const setupKeyboardHandlers = () => {
-            document.addEventListener('keydown', (e) => {
-                const now = Date.now();
-
-                // Delete/Backspaceキーの検出
-                if (e.key === 'Delete' || e.key === 'Backspace') {
-                    keyState.deletePressed = true;
-                    keyState.lastPressTime = now;
-                    checkKeyCombination();
-                }
-
-                // Spaceキーの検出
-                if (e.key === ' ' || e.key === 'Spacebar') {
-                    // テキスト入力欄にフォーカスがある場合は、通常の空白入力を許可
-                    if (document.activeElement === elements.input) {
-                        return; // 通常の動作を許可
-                    }
-
-                    e.preventDefault(); // それ以外の場合はデフォルト動作を防止
-                    keyState.spacePressed = true;
-                    keyState.lastPressTime = now;
-                    checkKeyCombination();
-                }
-            });
-
-            document.addEventListener('keyup', (e) => {
-                if (e.key === 'Delete' || e.key === 'Backspace') {
-                    keyState.deletePressed = false;
-                }
-
-                if (e.key === ' ' || e.key === 'Spacebar') {
-                    keyState.spacePressed = false;
-                }
-            });
-
-            const checkKeyCombination = () => {
-                if (keyState.deletePressed && keyState.spacePressed) {
-                    const timeDiff = Math.abs(keyState.lastPressTime - keyState.lastPressTime);
-
-                    if (timeDiff <= keyState.maxTimeDiff) {
-                        executeCode();
-
-                        if (CONFIG.debug) {
-                            debugLog('キーボードショートカット: Delete + Space 同時押しで実行');
-                        }
-                    }
-                }
-            };
-        };
-
-        // Arrow function; kept block scope for clarity
-        const handlePointerUp = (e) => {
-            if (e.pointerId !== drawState.currentTouchId) return;
-            e.preventDefault();
-            const capturingElement = document.querySelector(`[data-pointer-id="${e.pointerId}"]`);
-            if (capturingElement?.hasPointerCapture(e.pointerId)) { // Optional chaining
-                try {
-                    capturingElement.releasePointerCapture(e.pointerId);
-                    delete capturingElement.dataset.pointerId;
-                } catch (err) { console.error("Error releasing pointer capture on up:", err); }
-            }
-            drawState.longPressTimer && clearTimeout(drawState.longPressTimer); // Short-circuit clear
-            if (drawState.isActive && !drawState.isLongPress) {
-                endDrawing();
-            } else if (drawState.isLongPress) {
-                resetDrawState();
-                clearCanvas();
-            }
-            drawState.currentTouchId = null;
-        };
-
-        // Arrow function; kept block scope for clarity
-        const handlePointerMove = (e) => {
-            if (!drawState.isActive || e.pointerId !== drawState.currentTouchId) return;
-            e.preventDefault();
-
-            // 移動距離が最小閾値を超えた場合のみ処理
-            const moveX = e.clientX - drawState.pointerStartX;
-            const moveY = e.clientY - drawState.pointerStartY;
-            const moveDistance = Math.sqrt(moveX * moveX + moveY * moveY);
-
-            if (moveDistance >= CONFIG.sensitivity.minSwipeDistance) {
-                drawState.longPressTimer && clearTimeout(drawState.longPressTimer); // Short-circuit clear
-                drawState.longPressTimer = null; // Ensure timer is nullified on move
-                detectDot(e.clientX, e.clientY);
-            }
-        };
-
-        // Arrow function; kept block scope for clarity (setTimeout logic)
-        const handlePointerDown = (e, element) => {
-            e.preventDefault();
-            if (element.hasPointerCapture(e.pointerId)) { return; }
-            try {
-                element.setPointerCapture(e.pointerId);
-                element.dataset.pointerId = e.pointerId;
-            } catch (err) { console.error("Error setting pointer capture:", err); }
-
-            drawState.isLongPress = false;
-            drawState.currentTouchId = e.pointerId;
-            drawState.pointerStartTime = Date.now();
-            drawState.pointerStartX = e.clientX;
-            drawState.pointerStartY = e.clientY;
-
-            const digit = element.dataset.digit;
-            const word = element.dataset.word;
-
-            // 長押し処理
-            if (digit || word) {
-                drawState.longPressTimer && clearTimeout(drawState.longPressTimer);
-                drawState.longPressTimer = setTimeout(() => {
-                    // 長押し時に一定以上移動していたら長押し扱いしない
-                    const moveDistance = Math.sqrt(
-                        Math.pow(e.clientX - drawState.pointerStartX, 2) +
-                        Math.pow(e.clientY - drawState.pointerStartY, 2)
-                    );
-
-                    if (moveDistance < CONFIG.sensitivity.minSwipeDistance) {
-                        if (drawState.isActive && drawState.detectedDots.size > 1) return;
-                        insertAtCursor(digit || word);
-                        drawState.isLongPress = true;
-                        resetDrawState();
-                        clearCanvas();
-
-                        if (CONFIG.debug) {
-                            debugLog(`長押し入力: ${digit || word}`);
-                        }
-                    }
-                }, CONFIG.timing.longPressDuration);
-            }
-
-            // ドットグリッド内のタッチのみ処理
-            element.closest('#dot-grid') && startDrawing(element, e.clientX, e.clientY);
-        };
-
-        // --- Event Listener Setup ---
-        // Arrow function; kept block scope for clarity
-        const setupGestureListeners = () => {
-            document.addEventListener('pointermove', handlePointerMove, { passive: false });
-            document.addEventListener('pointerup', handlePointerUp, { passive: false });
-            document.addEventListener('pointercancel', handlePointerUp, { passive: false });
-        };
-
-        // Arrow function; kept block scope for clarity
-        const setupSpecialButtonListeners = () => {
-            const deleteBtn = elements.specialRow.querySelector('[data-action="delete"]');
-            const spaceBtn = elements.specialRow.querySelector('[data-action="space"]');
-            const zeroBtn = elements.specialRow.querySelector('[data-digit="0"]');
-
-            // deleteボタン (*) の設定
-            if (deleteBtn) {
-                deleteBtn.addEventListener('click', (e) => {
-                    handleSpecialButtonClick(e, 'delete', {
-                        single: () => handleDeleteAction(false), // 一文字削除
-                        double: () => handleDeleteAction(true),  // トークン削除
-                        long: () => {/* 別の機能があれば */ }
-                    });
-                });
-
-                // 長押しイベント
-                deleteBtn.addEventListener('pointerdown', (e) => {
-                    handleSpecialButtonLongPress(e, deleteBtn, () => {
-                        // 長押し時の処理（例：全消去など）
-                        // 今回は実装しないが将来拡張用
-                    });
-                });
-            }
-
-            // 0ボタン
-            if (zeroBtn) {
-                zeroBtn.addEventListener('click', (e) => {
-                    handleSpecialButtonClick(e, 'zero', {
-                        single: () => insertAtCursor('0'),
-                        double: () => {/* 別の機能があれば */ },
-                        long: () => {/* 別の機能があれば */ }
-                    });
-                });
-
-                // 長押しイベント
-                zeroBtn.addEventListener('pointerdown', (e) => {
-                    handleSpecialButtonLongPress(e, zeroBtn, () => {
-                        // 長押し時の処理（将来拡張用）
-                    });
-                });
-            }
-
-            // #ボタン（空白）
-            if (spaceBtn) {
-                spaceBtn.addEventListener('click', (e) => {
-                    handleSpecialButtonClick(e, 'space', {
-                        single: () => insertAtCursor(' '),    // 空白を挿入
-                        double: () => insertAtCursor('\n'),   // 改行を挿入
-                        long: () => {/* 別の機能があれば */ }
-                    });
-                });
-
-                // 長押しイベント
-                spaceBtn.addEventListener('pointerdown', (e) => {
-                    handleSpecialButtonLongPress(e, spaceBtn, () => {
-                        // 長押し時の処理（将来拡張用）
-                    });
-                });
-            }
-
-            // * + # の同時押し検出機能
-            setupCombinedButtonPress(deleteBtn, spaceBtn);
-        };
-
-        // 実行ボタンのイベント設定
-        const setupExecuteButtonListener = () => {
-            elements.executeButton.addEventListener('click', executeCode);
-        };
-
-        // Arrow function; kept block scope for clarity
-        const setupDotEventListeners = () => {
-            const dots = document.querySelectorAll('#dot-grid .dot');
-            dots.forEach(dot => {
-                dot.addEventListener('pointerdown', (e) => handlePointerDown(e, dot), { passive: false });
-            });
-        };
-
-        // --- Canvas Resizing ---
-        // Arrow function; kept block scope for clarity
-        const resizeCanvas = () => {
-            const rect = elements.d2dArea.getBoundingClientRect();
-            const style = window.getComputedStyle(elements.d2dArea);
-            const paddingLeft = parseFloat(style.paddingLeft);
-            const paddingTop = parseFloat(style.paddingTop);
-            elements.lineCanvas.width = elements.d2dArea.clientWidth - paddingLeft * 2;
-            elements.lineCanvas.height = elements.d2dArea.clientHeight - paddingTop * 2;
-            elements.lineCanvas.style.left = `${paddingLeft}px`;
-            elements.lineCanvas.style.top = `${paddingTop}px`;
-            updateCanvas();
-        };
-
-        // --- Debug Functions ---
-        // デバッグログ関数
-        const debugLog = (message) => {
-            if (!CONFIG.debug) return;
-
-            const output = document.getElementById('debug-output');
-            if (!output) return;
-
-            const logEntry = document.createElement('div');
-            logEntry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
-            output.prepend(logEntry);
-
-            // 古いログを削除
-            while (output.children.length > 10) {
-                output.removeChild(output.lastChild);
-            }
-        };
-
-        // --- デバッグとパラメータ調整インターフェース ---
-        const setupDebugInterface = () => {
-            if (!CONFIG.debug) return;
-
-            const debugSection = document.createElement('section');
-            debugSection.id = 'debug-panel';
-
-            const h2 = document.createElement('h2');
-            h2.textContent = 'Debug Controls';
-            debugSection.appendChild(h2);
-
-            // センシティビティコントロール
-            addSliderControl(debugSection, 'hitRadius', 'Hit Radius', 5, 50, CONFIG.sensitivity.hitRadius,
-                (value) => { CONFIG.sensitivity.hitRadius = Number(value); });
-            addSliderControl(debugSection, 'minSwipe', 'Min Swipe', 1, 20, CONFIG.sensitivity.minSwipeDistance,
-                (value) => { CONFIG.sensitivity.minSwipeDistance = Number(value); });
-
-            // タイミングコントロール
-            addSliderControl(debugSection, 'multiStroke', 'Multi-Stroke Timeout', 100, 2000, CONFIG.timing.multiStrokeTimeout,
-                (value) => { CONFIG.timing.multiStrokeTimeout = Number(value); });
-            addSliderControl(debugSection, 'longPress', 'Long Press Duration', 100, 1000, CONFIG.timing.longPressDuration,
-                (value) => { CONFIG.timing.longPressDuration = Number(value); });
-            addSliderControl(debugSection, 'debounce', 'Debounce Time', 10, 200, CONFIG.sensitivity.debounceTime,
-                (value) => { CONFIG.sensitivity.debounceTime = Number(value); });
-
-            // レイアウトコントロール
-            addSliderControl(debugSection, 'dotSize', 'Dot Size', 30, 80, CONFIG.layout.dotSize,
-                (value) => {
-                    CONFIG.layout.dotSize = Number(value);
-                    updateConfigStyles();
-                    initKeypad();
-                });
-            addSliderControl(debugSection, 'dotGap', 'Dot Gap', 5, 30, CONFIG.layout.dotGap,
-                (value) => {
-                    CONFIG.layout.dotGap = Number(value);
-                    updateConfigStyles();
-                    initKeypad();
-                });
-
-            // サンプルコード例
-            const sampleCodeHeader = document.createElement('h3');
-            sampleCodeHeader.textContent = 'サンプルコード';
-            sampleCodeHeader.style.marginTop = '15px';
-            debugSection.appendChild(sampleCodeHeader);
-
-            const sampleCodes = {
-                'FizzBuzz':
-                    `// FizzBuzz
+   drawState.isActive = keepActive;
+   drawState.detectedDots.forEach(dot => dot.classList.remove('detected'));
+   drawState.detectedDots.clear();
+   drawState.totalValue = 0;
+   drawState.isLongPress = false;
+   drawState.currentStrokeDetected = false;
+   !keepActive && (drawState.lastStrokeTime = 0); // Short-circuit assignment
+   drawState.longPressTimer && clearTimeout(drawState.longPressTimer); // Short-circuit clear
+   drawState.longPressTimer = null;
+   drawState.strokeTimer && clearTimeout(drawState.strokeTimer);
+   drawState.strokeTimer = null;
+};
+
+// Arrow function; using short-circuit return
+const recognizeLetter = (totalValue) => {
+   const recognized = letterPatterns[totalValue] || null;
+   if (recognized && CONFIG.debug) {
+       debugLog(`認識: 値=${totalValue}, 文字=${recognized}`);
+   } else if (CONFIG.debug) {
+       debugLog(`認識失敗: 値=${totalValue}`);
+   }
+   return recognized;
+};
+
+// Arrow function; kept block scope for clarity (setTimeout logic)
+const endDrawing = () => {
+   if (!drawState.isActive) return;
+   
+   const now = Date.now();
+   drawState.lastStrokeTime = now;
+   
+   // 現在のストロークで何かドットを検出した場合のみ処理を続行
+   if (drawState.currentStrokeDetected) {
+       drawState.currentStrokeDetected = false;
+       
+       // タイムアウト後に文字認識を試みる
+       drawState.strokeTimer = setTimeout(() => {
+           const elapsed = Date.now() - drawState.lastStrokeTime;
+           if (elapsed >= CONFIG.timing.multiStrokeTimeout - 50) {
+               if (drawState.detectedDots.size > 0 && drawState.totalValue > 0) {
+                   const recognized = recognizeLetter(drawState.totalValue);
+                   if (recognized) {
+                       insertAtCursor(recognized);
+                       // 成功を視覚的に示す一時的なフィードバック
+                       const feedbackEl = document.createElement('div');
+                       feedbackEl.className = 'recognition-feedback';
+                       feedbackEl.textContent = recognized;
+                       elements.d2dArea.appendChild(feedbackEl);
+                       setTimeout(() => feedbackEl.remove(), 800);
+                   }
+               }
+               resetDrawState();
+               clearCanvas();
+           }
+       }, CONFIG.timing.multiStrokeTimeout);
+   }
+};
+
+// Arrow function for conciseness
+const addDetectedDot = (dotElement) => {
+   if (!dotElement || drawState.detectedDots.has(dotElement)) return;
+   dotElement.classList.add('detected');
+   drawState.detectedDots.add(dotElement);
+   drawState.currentStrokeDetected = true;
+   const value = parseInt(dotElement.dataset.value, 10);
+   !isNaN(value) && (drawState.totalValue += value); // Short-circuit addition
+   
+   if (CONFIG.debug) {
+       debugLog(`ドット検出: index=${dotElement.dataset.index}, value=${value}, total=${drawState.totalValue}`);
+   }
+};
+
+// Arrow function; kept block scope for clarity (loop)
+const detectDot = (clientX, clientY) => {
+   if (!drawState.isActive) return;
+   
+   // 前回の検出から最小間隔が経過していない場合はスキップ
+   const now = Date.now();
+   if (now - drawState.lastDetectionTime < CONFIG.sensitivity.debounceTime) return;
+   drawState.lastDetectionTime = now;
+   
+   const dots = document.querySelectorAll('#dot-grid .dot');
+   let detected = false;
+   
+   dots.forEach(dot => {
+       if (drawState.detectedDots.has(dot)) return;
+       
+       const rect = dot.getBoundingClientRect();
+       const centerX = rect.left + rect.width / 2;
+       const centerY = rect.top + rect.height / 2;
+       
+       // 中心からの距離に基づいて判定（円形の当たり判定）
+       const distance = Math.sqrt(
+           Math.pow(clientX - centerX, 2) + 
+           Math.pow(clientY - centerY, 2)
+       );
+       
+       // 設定した半径内にある場合のみ検出
+       if (distance <= CONFIG.sensitivity.hitRadius) {
+           addDetectedDot(dot);
+           detected = true;
+       }
+   });
+   
+   detected && updateCanvas();
+};
+
+// Arrow function; kept block scope for clarity
+const startDrawing = (dotElement, startX, startY) => {
+   if (!dotElement || !dotElement.classList.contains('dot') || !dotElement.closest('#dot-grid')) return;
+   const now = Date.now();
+   (!drawState.isActive || now - drawState.lastStrokeTime > CONFIG.timing.multiStrokeTimeout) && resetDrawState(true); // Short-circuit reset
+   drawState.isActive = true;
+   drawState.startX = startX;
+   drawState.startY = startY;
+   drawState.lastDetectionTime = now;
+   addDetectedDot(dotElement);
+   updateCanvas();
+};
+
+// --- Event Handlers ---
+// 削除アクション拡張
+const handleDeleteAction = (deleteToken = false) => {
+   const textarea = elements.input;
+   const cursorPos = textarea.selectionStart;
+   
+   if (cursorPos > 0) {
+       if (deleteToken) {
+           // トークン（単語）削除モード
+           // 直前の空白文字まで削除
+           let textBefore = textarea.value.substring(0, cursorPos);
+           const textAfter = textarea.value.substring(cursorPos);
+           
+           // 最後の空白を見つける
+           const lastSpaceIndex = textBefore.lastIndexOf(' ');
+           
+           if (lastSpaceIndex >= 0) {
+               // 空白を残す形で削除
+               textBefore = textBefore.substring(0, lastSpaceIndex + 1);
+           } else {
+               // 空白がない場合は全削除
+               textBefore = '';
+           }
+           
+           textarea.value = textBefore + textAfter;
+           textarea.selectionStart = textarea.selectionEnd = textBefore.length;
+       } else {
+           // 一文字削除
+           const textBefore = textarea.value.substring(0, cursorPos - 1);
+           const textAfter = textarea.value.substring(cursorPos);
+           textarea.value = textBefore + textAfter;
+           textarea.selectionStart = textarea.selectionEnd = cursorPos - 1;
+       }
+   }
+   textarea.focus();
+};
+
+// クリックタイプを判定して適切な関数を実行
+const handleSpecialButtonClick = (e, buttonType, actions) => {
+   e.preventDefault();
+   
+   const now = Date.now();
+   
+   if (specialButtonState.clickTarget === buttonType && 
+       now - specialButtonState.lastClickTime < specialButtonState.doubleClickDelay) {
+       // ダブルクリック検出
+       clearTimeout(specialButtonState.clickTimer);
+       specialButtonState.clickCount = 0;
+       specialButtonState.clickTarget = null;
+       actions.double();
+       
+       if (CONFIG.debug) {
+           debugLog(`ダブルクリック: ${buttonType}`);
+       }
+   } else {
+       // シングルクリックの可能性
+       specialButtonState.clickCount = 1;
+       specialButtonState.lastClickTime = now;
+       specialButtonState.clickTarget = buttonType;
+       
+       // シングルクリック判定のタイマー
+       specialButtonState.clickTimer = setTimeout(() => {
+           if (specialButtonState.clickCount === 1) {
+               actions.single();
+               if (CONFIG.debug) {
+                   debugLog(`シングルクリック: ${buttonType}`);
+               }
+           }
+           specialButtonState.clickCount = 0;
+           specialButtonState.clickTarget = null;
+       }, specialButtonState.doubleClickDelay);
+   }
+};
+
+// 長押し検出
+const handleSpecialButtonLongPress = (e, button, action) => {
+   e.preventDefault();
+   
+   const longPressTimer = setTimeout(() => {
+       action();
+       button.classList.add('long-pressed');
+       
+       if (CONFIG.debug) {
+           debugLog(`長押し: ${button.dataset.action || button.dataset.digit}`);
+       }
+       
+       setTimeout(() => button.classList.remove('long-pressed'), 200);
+   }, CONFIG.timing.longPressDuration);
+   
+   // ポインターアップでタイマーをクリア
+   const clearTimer = () => {
+       clearTimeout(longPressTimer);
+       button.removeEventListener('pointerup', clearTimer);
+       button.removeEventListener('pointercancel', clearTimer);
+       button.removeEventListener('pointerleave', clearTimer);
+   };
+   
+   button.addEventListener('pointerup', clearTimer);
+   button.addEventListener('pointercancel', clearTimer);
+   button.addEventListener('pointerleave', clearTimer);
+};
+
+// コード実行機能
+const executeCode = () => {
+   const code = elements.input.value;
+   if (!code.trim()) return;
+   
+   try {
+       // holonコードを実行
+       const result = holonInterpreter.execute(code);
+       
+       // 結果を出力エリアに表示
+       elements.output.value = result !== undefined ? result : "実行完了";
+       
+       // 視覚的フィードバック
+       elements.output.classList.add('executed');
+       setTimeout(() => elements.output.classList.remove('executed'), 300);
+       
+       // 実行成功時のみ入力欄をクリア
+       if (!result.startsWith("エラー:")) {
+           elements.input.value = "";
+           
+           // 実行後にoutputタブに自動切替
+           const outputTab = document.querySelector('.tab-button[data-tab="output-tab"]');
+           if (outputTab) {
+               outputTab.click();
+           }
+       }
+       
+       if (CONFIG.debug) {
+           debugLog(`コード実行: ${code.substring(0, 20)}${code.length > 20 ? '...' : ''}`);
+       }
+   } catch (error) {
+       elements.output.value = `エラー: ${error.message}`;
+       if (CONFIG.debug) {
+           debugLog(`実行エラー: ${error.message}`);
+       }
+   }
+};
+
+// --- * + # の同時押し検出
+const setupCombinedButtonPress = (deleteBtn, spaceBtn) => {
+   if (!deleteBtn || !spaceBtn) return;
+   
+   const combinedState = {
+       deletePressed: false,
+       spacePressed: false,
+       pressStartTime: 0,
+       maxTimeDiff: 300 // ミリ秒、同時押しと認識する最大時間差
+   };
+   
+   // * ボタンのイベント
+   deleteBtn.addEventListener('pointerdown', () => {
+       combinedState.deletePressed = true;
+       combinedState.pressStartTime = Date.now();
+       checkCombinedPress();
+   });
+   
+   deleteBtn.addEventListener('pointerup', () => {
+       combinedState.deletePressed = false;
+   });
+   
+   // # ボタンのイベント
+   spaceBtn.addEventListener('pointerdown', () => {
+       combinedState.spacePressed = true;
+       combinedState.pressStartTime = Date.now();
+       checkCombinedPress();
+   });
+   
+   spaceBtn.addEventListener('pointerup', () => {
+       combinedState.spacePressed = false;
+   });
+   
+   // 同時押し検出
+   const checkCombinedPress = () => {
+       if (combinedState.deletePressed && combinedState.spacePressed) {
+           // 両方のボタンが押されている場合、実行機能を起動
+           executeCode();
+           
+           // 視覚的フィードバック
+           deleteBtn.classList.add('combined-pressed');
+           spaceBtn.classList.add('combined-pressed');
+           
+           setTimeout(() => {
+               deleteBtn.classList.remove('combined-pressed');
+               spaceBtn.classList.remove('combined-pressed');
+           }, 200);
+       }
+   };
+};
+
+// キーボードの同時押し検出
+const setupKeyboardHandlers = () => {
+   document.addEventListener('keydown', (e) => {
+       const now = Date.now();
+       
+       // Delete/Backspaceキーの検出
+       if (e.key === 'Delete' || e.key === 'Backspace') {
+           keyState.deletePressed = true;
+           keyState.lastPressTime = now;
+           checkKeyCombination();
+       }
+       
+       // Spaceキーの検出
+       if (e.key === ' ' || e.key === 'Spacebar') {
+           // テキスト入力欄にフォーカスがある場合は、通常の空白入力を許可
+           if (document.activeElement === elements.input) {
+               return; // 通常の動作を許可
+           }
+           
+           e.preventDefault(); // それ以外の場合はデフォルト動作を防止
+           keyState.spacePressed = true;
+           keyState.lastPressTime = now;
+           checkKeyCombination();
+       }
+   });
+   
+   document.addEventListener('keyup', (e) => {
+       if (e.key === 'Delete' || e.key === 'Backspace') {
+           keyState.deletePressed = false;
+       }
+       
+       if (e.key === ' ' || e.key === 'Spacebar') {
+           keyState.spacePressed = false;
+       }
+   });
+   
+   const checkKeyCombination = () => {
+       if (keyState.deletePressed && keyState.spacePressed) {
+           const timeDiff = Math.abs(keyState.lastPressTime - keyState.lastPressTime);
+           
+           if (timeDiff <= keyState.maxTimeDiff) {
+               executeCode();
+               
+               if (CONFIG.debug) {
+                   debugLog('キーボードショートカット: Delete + Space 同時押しで実行');
+               }
+           }
+       }
+   };
+};
+
+// タッチイベント用ハンドラー
+const handleTouchMove = (e) => {
+   e.preventDefault();
+   if (!drawState.isActive || e.touches.length === 0) return;
+   
+   const touch = e.touches[0];
+   detectDot(touch.clientX, touch.clientY);
+};
+
+const handleTouchEnd = (e) => {
+   e.preventDefault();
+   if (!drawState.isActive) return;
+   
+   if (drawState.longPressTimer) {
+       clearTimeout(drawState.longPressTimer);
+   }
+   
+   if (!drawState.isLongPress) {
+       endDrawing();
+   } else {
+       resetDrawState();
+   }
+};
+
+// Arrow function; kept block scope for clarity
+const handlePointerUp = (e) => {
+   if (e.pointerId !== drawState.currentTouchId) return;
+   e.preventDefault();
+   const capturingElement = document.querySelector(`[data-pointer-id="${e.pointerId}"]`);
+    if (capturingElement?.hasPointerCapture(e.pointerId)) { // Optional chaining
+        try {
+           capturingElement.releasePointerCapture(e.pointerId);
+           delete capturingElement.dataset.pointerId;
+        } catch(err) { console.error("Error releasing pointer capture on up:", err); }
+   }
+   drawState.longPressTimer && clearTimeout(drawState.longPressTimer); // Short-circuit clear
+   if (drawState.isActive && !drawState.isLongPress) {
+       endDrawing();
+   } else if (drawState.isLongPress) {
+        resetDrawState();
+        clearCanvas();
+   }
+   drawState.currentTouchId = null;
+};
+
+// Arrow function; kept block scope for clarity
+const handlePointerMove = (e) => {
+   if (!drawState.isActive || e.pointerId !== drawState.currentTouchId) return;
+   e.preventDefault();
+   
+   // 移動距離が最小閾値を超えた場合のみ処理
+   const moveX = e.clientX - drawState.pointerStartX;
+   const moveY = e.clientY - drawState.pointerStartY;
+   const moveDistance = Math.sqrt(moveX * moveX + moveY * moveY);
+   
+   if (moveDistance >= CONFIG.sensitivity.minSwipeDistance) {
+       drawState.longPressTimer && clearTimeout(drawState.longPressTimer); // Short-circuit clear
+       drawState.longPressTimer = null; // Ensure timer is nullified on move
+       detectDot(e.clientX, e.clientY);
+   }
+};
+
+// Arrow function; kept block scope for clarity (setTimeout logic)
+const handlePointerDown = (e, element) => {
+   e.preventDefault();
+   if (element.hasPointerCapture(e.pointerId)) { return; }
+   try {
+       element.setPointerCapture(e.pointerId);
+       element.dataset.pointerId = e.pointerId;
+   } catch (err) { console.error("Error setting pointer capture:", err); }
+
+   drawState.isLongPress = false;
+   drawState.currentTouchId = e.pointerId;
+   drawState.pointerStartTime = Date.now();
+   drawState.pointerStartX = e.clientX;
+   drawState.pointerStartY = e.clientY;
+   
+   const digit = element.dataset.digit;
+   const word = element.dataset.word;
+
+   // 長押し処理
+   if (digit || word) {
+       drawState.longPressTimer && clearTimeout(drawState.longPressTimer);
+       drawState.longPressTimer = setTimeout(() => {
+           // 長押し時に一定以上移動していたら長押し扱いしない
+           const moveDistance = Math.sqrt(
+               Math.pow(e.clientX - drawState.pointerStartX, 2) + 
+               Math.pow(e.clientY - drawState.pointerStartY, 2)
+           );
+           
+           if (moveDistance < CONFIG.sensitivity.minSwipeDistance) {
+               if (drawState.isActive && drawState.detectedDots.size > 1) return;
+               insertAtCursor(digit || word);
+               drawState.isLongPress = true;
+               resetDrawState();
+               clearCanvas();
+               
+               if (CONFIG.debug) {
+                   debugLog(`長押し入力: ${digit || word}`);
+               }
+           }
+       }, CONFIG.timing.longPressDuration);
+   }
+
+   // ドットグリッド内のタッチのみ処理
+   element.closest('#dot-grid') && startDrawing(element, e.clientX, e.clientY);
+};
+
+// --- Event Listener Setup ---
+// タブ切り替え機能
+const setupTabSystem = () => {
+   const tabButtons = document.querySelectorAll('.tab-button');
+   const tabContents = document.querySelectorAll('.tab-content');
+   
+   tabButtons.forEach(button => {
+       button.addEventListener('click', () => {
+           const tabId = button.dataset.tab;
+           
+           // 全てのタブを非アクティブにする
+           tabButtons.forEach(btn => btn.classList.remove('active'));
+           tabContents.forEach(content => content.classList.remove('active'));
+           
+           // クリックされたタブをアクティブにする
+           button.classList.add('active');
+           document.getElementById(tabId).classList.add('active');
+           
+           // input-tabがアクティブになったときにテキスト入力にフォーカス
+           if (tabId === 'input-tab') {
+               document.getElementById('text-input').focus();
+           }
+       });
+   });
+};
+
+// タッチとポインターイベントを統合した処理
+const setupGestureListeners = () => {
+   // ポインターイベント
+   document.addEventListener('pointermove', handlePointerMove, { passive: false });
+   document.addEventListener('pointerup', handlePointerUp, { passive: false });
+   document.addEventListener('pointercancel', handlePointerUp, { passive: false });
+   
+   // タッチイベント（バックアップとして）
+   document.addEventListener('touchmove', handleTouchMove, { passive: false });
+   document.addEventListener('touchend', handleTouchEnd, { passive: false });
+   document.addEventListener('touchcancel', handleTouchEnd, { passive: false });
+};
+
+// Arrow function; kept block scope for clarity
+const setupSpecialButtonListeners = () => {
+   const deleteBtn = elements.specialRow.querySelector('[data-action="delete"]');
+   const spaceBtn = elements.specialRow.querySelector('[data-action="space"]');
+   const zeroBtn = elements.specialRow.querySelector('[data-digit="0"]');
+   
+   // deleteボタン (*) の設定
+   if (deleteBtn) {
+       deleteBtn.addEventListener('click', (e) => {
+           handleSpecialButtonClick(e, 'delete', {
+               single: () => handleDeleteAction(false), // 一文字削除
+               double: () => handleDeleteAction(true),  // トークン削除
+               long: () => {/* 別の機能があれば */}
+           });
+       });
+       
+       // 長押しイベント
+       deleteBtn.addEventListener('pointerdown', (e) => {
+           handleSpecialButtonLongPress(e, deleteBtn, () => {
+               // 長押し時の処理（例：全消去など）
+               // 今回は実装しないが将来拡張用
+           });
+       });
+   }
+   
+   // 0ボタン
+   if (zeroBtn) {
+       zeroBtn.addEventListener('click', (e) => {
+           handleSpecialButtonClick(e, 'zero', {
+               single: () => insertAtCursor('0'),
+               double: () => {/* 別の機能があれば */},
+               long: () => {/* 別の機能があれば */}
+           });
+       });
+       
+       // 長押しイベント
+       zeroBtn.addEventListener('pointerdown', (e) => {
+           handleSpecialButtonLongPress(e, zeroBtn, () => {
+               // 長押し時の処理（将来拡張用）
+           });
+       });
+   }
+   
+   // #ボタン（空白）
+   if (spaceBtn) {
+       spaceBtn.addEventListener('click', (e) => {
+           handleSpecialButtonClick(e, 'space', {
+               single: () => insertAtCursor(' '),    // 空白を挿入
+               double: () => insertAtCursor('\n'),   // 改行を挿入
+               long: () => {/* 別の機能があれば */}
+           });
+       });
+       
+       // 長押しイベント
+       spaceBtn.addEventListener('pointerdown', (e) => {
+           handleSpecialButtonLongPress(e, spaceBtn, () => {
+               // 長押し時の処理（将来拡張用）
+           });
+       });
+   }
+   
+   // * + # の同時押し検出機能
+   setupCombinedButtonPress(deleteBtn, spaceBtn);
+};
+
+// 実行ボタンのイベント設定
+const setupExecuteButtonListener = () => {
+   elements.executeButton.addEventListener('click', executeCode);
+};
+
+// ドットのイベントリスナー設定
+const setupDotEventListeners = () => {
+   const dots = document.querySelectorAll('#dot-grid .dot');
+   dots.forEach(dot => {
+       // ポインターイベント
+       dot.addEventListener('pointerdown', (e) => handlePointerDown(e, dot), { passive: false });
+       
+       // タッチイベント（バックアップ）
+       dot.addEventListener('touchstart', (e) => {
+           e.preventDefault();
+           if (e.touches.length === 0) return;
+           
+           const touch = e.touches[0];
+           const digit = dot.dataset.digit;
+           const word = dot.dataset.word;
+           
+           // 長押し処理
+           if (digit || word) {
+               if (drawState.longPressTimer) {
+                   clearTimeout(drawState.longPressTimer);
+               }
+               
+               drawState.longPressTimer = setTimeout(() => {
+                   insertAtCursor(digit || word);
+                   drawState.isLongPress = true;
+                   
+                   if (CONFIG.debug) {
+                       debugLog(`長押し入力: ${digit || word}`);
+                   }
+               }, CONFIG.timing.longPressDuration);
+           }
+           
+           // ドットグリッド内のタッチのみ処理
+           if (dot.closest('#dot-grid')) {
+               drawState.isActive = true;
+               drawState.lastDetectionTime = Date.now();
+               addDetectedDot(dot);
+           }
+       }, { passive: false });
+   });
+};
+
+// --- Canvas Resizing ---
+// Arrow function; kept block scope for clarity
+const resizeCanvas = () => {
+   if (!elements.lineCanvas || !elements.d2dArea) return;
+   
+   const rect = elements.d2dArea.getBoundingClientRect();
+   const style = window.getComputedStyle(elements.d2dArea);
+   const paddingLeft = parseFloat(style.paddingLeft);
+   const paddingTop = parseFloat(style.paddingTop);
+   elements.lineCanvas.width = elements.d2dArea.clientWidth - paddingLeft * 2;
+   elements.lineCanvas.height = elements.d2dArea.clientHeight - paddingTop * 2;
+   elements.lineCanvas.style.left = `${paddingLeft}px`;
+   elements.lineCanvas.style.top = `${paddingTop}px`;
+   updateCanvas();
+};
+
+// --- Debug Functions ---
+// デバッグログ関数
+const debugLog = (message) => {
+   if (!CONFIG.debug) return;
+   
+   const output = document.getElementById('debug-output');
+   if (!output) return;
+   
+   const logEntry = document.createElement('div');
+   logEntry.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+   output.prepend(logEntry);
+   
+   // 古いログを削除
+   while (output.children.length > 10) {
+       output.removeChild(output.lastChild);
+   }
+};
+
+// --- デバッグとパラメータ調整インターフェース ---
+const setupDebugInterface = () => {
+   if (!CONFIG.debug) return;
+   
+   const debugSection = document.createElement('section');
+   debugSection.id = 'debug-panel';
+   
+   const h2 = document.createElement('h2');
+   h2.textContent = 'Debug Controls';
+   debugSection.appendChild(h2);
+   
+   // センシティビティコントロール
+   addSliderControl(debugSection, 'hitRadius', 'Hit Radius', 5, 50, CONFIG.sensitivity.hitRadius, 
+       (value) => { CONFIG.sensitivity.hitRadius = Number(value); });
+   addSliderControl(debugSection, 'minSwipe', 'Min Swipe', 1, 20, CONFIG.sensitivity.minSwipeDistance, 
+       (value) => { CONFIG.sensitivity.minSwipeDistance = Number(value); });
+   
+   // タイミングコントロール
+   addSliderControl(debugSection, 'multiStroke', 'Multi-Stroke Timeout', 100, 2000, CONFIG.timing.multiStrokeTimeout, 
+       (value) => { CONFIG.timing.multiStrokeTimeout = Number(value); });
+   addSliderControl(debugSection, 'longPress', 'Long Press Duration', 100, 1000, CONFIG.timing.longPressDuration, 
+       (value) => { CONFIG.timing.longPressDuration = Number(value); });
+   addSliderControl(debugSection, 'debounce', 'Debounce Time', 10, 200, CONFIG.sensitivity.debounceTime, 
+       (value) => { CONFIG.sensitivity.debounceTime = Number(value); });
+   
+   // レイアウトコントロール
+   addSliderControl(debugSection, 'dotSize', 'Dot Size', 30, 80, CONFIG.layout.dotSize, 
+       (value) => { 
+           CONFIG.layout.dotSize = Number(value); 
+           updateConfigStyles();
+           initKeypad();
+       });
+   addSliderControl(debugSection, 'dotGap', 'Dot Gap', 5, 30, CONFIG.layout.dotGap, 
+       (value) => { 
+           CONFIG.layout.dotGap = Number(value); 
+           updateConfigStyles();
+           initKeypad();
+       });
+   
+   // サンプルコード例
+   const sampleCodeHeader = document.createElement('h3');
+   sampleCodeHeader.textContent = 'サンプルコード';
+   sampleCodeHeader.style.marginTop = '15px';
+   debugSection.appendChild(sampleCodeHeader);
+   
+   const sampleCodes = {
+       'FizzBuzz': 
+`// FizzBuzz
 FIZZBUZZ => (max) => {
-    result => []
-    
-    RANGE(1, max).forEach(i => {
-        output => 
-            i % 15 == 0 ? "FizzBuzz"
-            : i % 3 == 0 ? "Fizz"
-            : i % 5 == 0 ? "Buzz"
-            : i.toString()
-        
-        result.push(output)
-    })
-    
-    return result
+   result => []
+   
+   RANGE(1, max).forEach(i => {
+       output => 
+           i % 15 == 0 ? "FizzBuzz"
+           : i % 3 == 0 ? "Fizz"
+           : i % 5 == 0 ? "Buzz"
+           : i.toString()
+       
+       result.push(output)
+   })
+   
+   return result
 }
 
 result => FIZZBUZZ(20)
 PRINT(result.join(", "))`,
 
-                '計算例':
-                    `// 分数計算
+       '計算例':
+`// 分数計算
 a => 3/4
 b => 1/2
 
@@ -1318,200 +1506,238 @@ PRINT("積: " + product)
 numbers => [1, 2, 3, 4, 5]
 doubled => numbers.map(n => n * 2)
 PRINT(doubled)`
-            };
+   };
+   
+   const sampleButtonContainer = document.createElement('div');
+   sampleButtonContainer.style.display = 'flex';
+   sampleButtonContainer.style.gap = '10px';
+   sampleButtonContainer.style.marginBottom = '10px';
+   
+   for (const [name, code] of Object.entries(sampleCodes)) {
+       const button = document.createElement('button');
+       button.textContent = name;
+       button.style.padding = '5px 10px';
+       button.style.border = '1px solid #ccc';
+       button.style.borderRadius = '4px';
+       button.style.cursor = 'pointer';
+       
+       button.addEventListener('click', () => {
+           elements.input.value = code;
+           
+           // サンプルコードを読み込んだらinputタブに切り替え
+           const inputTab = document.querySelector('.tab-button[data-tab="input-tab"]');
+           if (inputTab) {
+               inputTab.click();
+           }
+       });
+       
+       sampleButtonContainer.appendChild(button);
+   }
+   
+   debugSection.appendChild(sampleButtonContainer);
+   
+   // デバッグ出力表示
+   const debugOutput = document.createElement('div');
+debugOutput.id = 'debug-output';
+debugOutput.className = 'debug-output';
+debugSection.appendChild(debugOutput);
 
-            const sampleButtonContainer = document.createElement('div');
-            sampleButtonContainer.style.display = 'flex';
-            sampleButtonContainer.style.gap = '10px';
-            sampleButtonContainer.style.marginBottom = '10px';
+document.querySelector('article').appendChild(debugSection);
+};
 
-            for (const [name, code] of Object.entries(sampleCodes)) {
-                const button = document.createElement('button');
-                button.textContent = name;
-                button.style.padding = '5px 10px';
-                button.style.border = '1px solid #ccc';
-                button.style.borderRadius = '4px';
-                button.style.cursor = 'pointer';
+// スライダーコントロールを追加するヘルパー関数
+const addSliderControl = (parent, id, label, min, max, initialValue, onChange) => {
+   const container = document.createElement('div');
+   container.className = 'control-container';
+   
+   const labelEl = document.createElement('label');
+   labelEl.textContent = `${label}: `;
+   labelEl.htmlFor = `control-${id}`;
+   
+   const slider = document.createElement('input');
+   slider.type = 'range';
+   slider.id = `control-${id}`;
+   slider.min = min;
+   slider.max = max;
+   slider.value = initialValue;
+   
+   const valueDisplay = document.createElement('span');
+   valueDisplay.textContent = initialValue;
+   valueDisplay.className = 'value-display';
+   
+   slider.addEventListener('input', () => {
+       valueDisplay.textContent = slider.value;
+       onChange(slider.value);
+   });
+   
+   container.appendChild(labelEl);
+   container.appendChild(slider);
+   container.appendChild(valueDisplay);
+   
+   parent.appendChild(container);
+};
 
-                button.addEventListener('click', () => {
-                    elements.input.value = code;
-                });
+// 設定に基づいてスタイルを動的に更新する関数
+const updateConfigStyles = () => {
+   // 既存のスタイル要素があれば削除
+   const existingStyle = document.getElementById('dynamic-config-styles');
+   existingStyle && existingStyle.remove();
+   
+   // 新しいスタイル要素を作成
+   const styleEl = document.createElement('style');
+   styleEl.id = 'dynamic-config-styles';
+   styleEl.textContent = `
+       .dot {
+           width: ${CONFIG.layout.dotSize}px;
+           height: ${CONFIG.layout.dotSize}px;
+       }
+       .dot.detected {
+           background-color: var(--color-error-dark);
+       }
+   `;
+   document.head.appendChild(styleEl);
+};
 
-                sampleButtonContainer.appendChild(button);
-            }
+// モバイルデバイス検出
+const isMobileDevice = () => {
+   return (window.innerWidth <= 600) || 
+          /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+};
 
-            debugSection.appendChild(sampleButtonContainer);
+// モバイル向け最適化
+const optimizeForMobile = () => {
+   // モバイル向けの調整
+   if (CONFIG.debug) {
+       debugLog("モバイルデバイスを検出しました - レイアウトを最適化します");
+   }
+   
+   // モバイル向けにドットサイズを調整
+   CONFIG.layout.dotSize = Math.min(CONFIG.layout.dotSize, 40);
+   CONFIG.layout.dotGap = Math.min(CONFIG.layout.dotGap, 8);
+   
+   // CSSカスタムプロパティを更新
+   document.documentElement.style.setProperty('--dot-size', `${CONFIG.layout.dotSize}px`);
+   document.documentElement.style.setProperty('--dot-gap', `${CONFIG.layout.dotGap}px`);
+   
+   // スタイルを更新
+   updateConfigStyles();
+};
 
-            // デバッグ出力表示
-            const debugOutput = document.createElement('div');
-            debugOutput.id = 'debug-output';
-            debugOutput.className = 'debug-output';
-            debugSection.appendChild(debugOutput);
+// --- Initialization ---
+// Arrow function; kept block scope for clarity
+const initKeypad = () => {
+   elements.dotGrid.innerHTML = '';
+   elements.specialRow.innerHTML = '';
+   
+   // 設定に基づいてドットグリッドのスタイルを設定
+   elements.dotGrid.style.gap = `${CONFIG.layout.dotGap}px`;
 
-            document.querySelector('article').appendChild(debugSection);
-        };
+   // Create 5x5 Dot Grid
+   for (let row = 0; row < CONFIG.layout.gridRows; row++) {
+       const rowContainer = document.createElement('div');
+       rowContainer.className = 'dot-row';
+       rowContainer.style.gap = `${CONFIG.layout.dotGap}px`;
+       
+       for (let col = 0; col < CONFIG.layout.gridCols; col++) {
+           const index = row * CONFIG.layout.gridCols + col;
+           const value = dotValues[index];
+           const dot = document.createElement('div');
+           dot.className = 'dot';
+           dot.dataset.index = index;
+           dot.dataset.value = value;
+           
+           // サイズを設定から取得
+           dot.style.width = `${CONFIG.layout.dotSize}px`;
+           dot.style.height = `${CONFIG.layout.dotSize}px`;
+           
+           const digit = numericPositions[index];
+           const word = dotWordMapping[value];
 
-        // スライダーコントロールを追加するヘルパー関数
-        const addSliderControl = (parent, id, label, min, max, initialValue, onChange) => {
-            const container = document.createElement('div');
-            container.className = 'control-container';
+           if (digit) {
+               dot.classList.add('numeric');
+               dot.textContent = digit;
+               dot.dataset.digit = digit;
+           } else if (word) {
+               dot.classList.add('word-dot');
+               dot.textContent = word;
+               dot.dataset.word = word;
+           }
+           rowContainer.appendChild(dot);
+       }
+       elements.dotGrid.appendChild(rowContainer);
+   }
 
-            const labelEl = document.createElement('label');
-            labelEl.textContent = `${label}: `;
-            labelEl.htmlFor = `control-${id}`;
+   // Create Special Buttons Row
+   const deleteButton = document.createElement('div');
+   deleteButton.className = 'special-button delete';
+   deleteButton.textContent = '*';
+   deleteButton.dataset.action = 'delete';
+   deleteButton.title = '削除';
+   elements.specialRow.appendChild(deleteButton);
 
-            const slider = document.createElement('input');
-            slider.type = 'range';
-            slider.id = `control-${id}`;
-            slider.min = min;
-            slider.max = max;
-            slider.value = initialValue;
+   const zeroButton = document.createElement('div');
+   zeroButton.className = 'dot numeric';
+   zeroButton.textContent = '0';
+   zeroButton.dataset.digit = '0';
+   elements.specialRow.appendChild(zeroButton);
 
-            const valueDisplay = document.createElement('span');
-            valueDisplay.textContent = initialValue;
-            valueDisplay.className = 'value-display';
+   const spaceButton = document.createElement('div');
+   spaceButton.className = 'special-button space';
+   spaceButton.textContent = '#';
+   spaceButton.dataset.action = 'space';
+   spaceButton.title = '空白';
+   elements.specialRow.appendChild(spaceButton);
 
-            slider.addEventListener('input', () => {
-                valueDisplay.textContent = slider.value;
-                onChange(slider.value);
-            });
+   // フォーカス制御
+   elements.d2dArea.tabIndex = -1; // フォーカス可能にする
+   elements.d2dArea.focus();
+   
+   // txt-inputのフォーカスイベントを監視
+   elements.input.addEventListener('focus', (e) => {
+       // ユーザーが明示的にクリックした場合のみフォーカスを許可
+       if (!e.isTrusted) {
+           elements.d2dArea.focus();
+       }
+   });
+   
+   // モバイルでのタッチイベント時のフォーカス制御
+   elements.d2dArea.addEventListener('touchstart', () => {
+       // d2dエリアがタッチされたら、txt-inputがフォーカスを持っていれば解除
+       if (document.activeElement === elements.input) {
+           elements.d2dArea.focus();
+       }
+   });
+   
+   // スタイルシートの動的更新
+   updateConfigStyles();
+   
+   resizeCanvas(); // Initial resize
+   window.addEventListener('resize', resizeCanvas); // Add resize listener
 
-            container.appendChild(labelEl);
-            container.appendChild(slider);
-            container.appendChild(valueDisplay);
+   setupDotEventListeners();
+   setupSpecialButtonListeners();
+   setupGestureListeners();
+};
 
-            parent.appendChild(container);
-        };
-
-        // 設定に基づいてスタイルを動的に更新する関数
-        const updateConfigStyles = () => {
-            // 既存のスタイル要素があれば削除
-            const existingStyle = document.getElementById('dynamic-config-styles');
-            existingStyle && existingStyle.remove();
-
-            // 新しいスタイル要素を作成
-            const styleEl = document.createElement('style');
-            styleEl.id = 'dynamic-config-styles';
-            styleEl.textContent = `
-                .dot {
-                    width: ${CONFIG.layout.dotSize}px;
-                    height: ${CONFIG.layout.dotSize}px;
-                }
-                .dot.detected {
-                    background-color: ${CONFIG.visual.detectedColor};
-                }
-                #line-canvas {
-                    pointer-events: none;
-                }
-            `;
-            document.head.appendChild(styleEl);
-        };
-
-        // --- Initialization ---
-        // Arrow function; kept block scope for clarity
-        const initKeypad = () => {
-            elements.dotGrid.innerHTML = '';
-            elements.specialRow.innerHTML = '';
-
-            // 設定に基づいてドットグリッドのスタイルを設定
-            elements.dotGrid.style.gap = `${CONFIG.layout.dotGap}px`;
-
-            // Create 5x5 Dot Grid
-            for (let row = 0; row < CONFIG.layout.gridRows; row++) {
-                const rowContainer = document.createElement('div');
-                rowContainer.className = 'dot-row';
-                rowContainer.style.gap = `${CONFIG.layout.dotGap}px`;
-
-                for (let col = 0; col < CONFIG.layout.gridCols; col++) {
-                    const index = row * CONFIG.layout.gridCols + col;
-                    const value = dotValues[index];
-                    const dot = document.createElement('div');
-                    dot.className = 'dot';
-                    dot.dataset.index = index;
-                    dot.dataset.value = value;
-
-                    // サイズを設定から取得
-                    dot.style.width = `${CONFIG.layout.dotSize}px`;
-                    dot.style.height = `${CONFIG.layout.dotSize}px`;
-
-                    const digit = numericPositions[index];
-                    const word = dotWordMapping[value];
-
-                    if (digit) {
-                        dot.classList.add('numeric');
-                        dot.textContent = digit;
-                        dot.dataset.digit = digit;
-                    } else if (word) {
-                        dot.classList.add('word-dot');
-                        dot.textContent = word;
-                        dot.dataset.word = word;
-                    }
-                    rowContainer.appendChild(dot);
-                }
-                elements.dotGrid.appendChild(rowContainer);
-            }
-
-            // Create Special Buttons Row
-            const deleteButton = document.createElement('div');
-            deleteButton.className = 'special-button delete';
-            deleteButton.textContent = '*';
-            deleteButton.dataset.action = 'delete';
-            deleteButton.title = '削除';
-            elements.specialRow.appendChild(deleteButton);
-
-            const zeroButton = document.createElement('div');
-            zeroButton.className = 'dot numeric';
-            zeroButton.textContent = '0';
-            zeroButton.dataset.digit = '0';
-            elements.specialRow.appendChild(zeroButton);
-
-            const spaceButton = document.createElement('div');
-            spaceButton.className = 'special-button space';
-            spaceButton.textContent = '#';
-            spaceButton.dataset.action = 'space';
-            spaceButton.title = '空白';
-            elements.specialRow.appendChild(spaceButton);
-
-            // フォーカス制御
-            elements.d2dArea.tabIndex = -1; // フォーカス可能にする
-            elements.d2dArea.focus();
-
-            // txt-inputのフォーカスイベントを監視
-            elements.input.addEventListener('focus', (e) => {
-                // ユーザーが明示的にクリックした場合のみフォーカスを許可
-                if (!e.isTrusted) {
-                    elements.d2dArea.focus();
-                }
-            });
-
-            // モバイルでのタッチイベント時のフォーカス制御
-            elements.d2dArea.addEventListener('touchstart', () => {
-                // d2dエリアがタッチされたら、txt-inputがフォーカスを持っていれば解除
-                if (document.activeElement === elements.input) {
-                    elements.d2dArea.focus();
-                }
-            });
-
-            // スタイルシートの動的更新
-            updateConfigStyles();
-
-            resizeCanvas(); // Initial resize
-            window.addEventListener('resize', resizeCanvas); // Add resize listener
-
-            setupDotEventListeners();
-            setupSpecialButtonListeners();
-            setupGestureListeners();
-        };
-
-        // --- Initial Setup ---
-        window.onload = () => {
-            initKeypad();
-            setupDebugInterface();
-            setupExecuteButtonListener();
-            setupKeyboardHandlers();
-        };
-    </script>
+// --- Initial Setup ---
+window.onload = () => {
+   // CSSカスタムプロパティを設定
+   document.documentElement.style.setProperty('--dot-size', `${CONFIG.layout.dotSize}px`);
+   document.documentElement.style.setProperty('--dot-gap', `${CONFIG.layout.dotGap}px`);
+   
+   initKeypad();
+   setupTabSystem(); // タブシステムの初期化を追加
+   setupDebugInterface();
+   setupExecuteButtonListener();
+   setupKeyboardHandlers();
+   
+   // モバイル検出とレイアウト最適化
+   if (isMobileDevice()) {
+       document.body.classList.add('mobile-device');
+       optimizeForMobile();
+   }
+};
+   </script>
 
 </body>
-
 </html>
