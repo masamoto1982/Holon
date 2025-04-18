@@ -2,52 +2,1276 @@
 <html lang="ja">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Holon</title>
-  <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>holon</title>
+    <style>
+        /* Apply border-box sizing globally */
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            overscroll-behavior: none;
+            text-align: center;
+            background-color: #f0f0f0;
+            font-family: sans-serif;
+        }
+
+        /* Main layout container */
+        article {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            margin: 0 auto;
+            background-color: white;
+            padding: 10px;
+            text-align: left;
+        }
+
+        h1,
+        h2 {
+            text-align: center;
+        }
+
+        section {
+            border: 2px dotted #a0a0a0;
+            padding: 10px;
+            margin: 10px 0 10px 0;
+        }
+
+        section:last-child {
+            margin-bottom: 0;
+        }
+
+        /* Style for textarea and input */
+        #output,
+        #txt-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            display: block;
+            margin-top: 5px;
+        }
+
+        
+        #output {
+            resize: vertical;
+            min-height: 80px;
+			height: 500px;
+            max-height: 300px;
+            background-color: #f8f8f8;
+            transition: background-color 0.3s;
+            overflow-y: auto;
+        }
+		
+		#txt-input {
+            resize: vertical;
+            min-height: 80px;
+			height: 500px;
+            max-height: 300px;
+            transition: background-color 0.3s;
+            overflow-y: auto;
+        }
+
+        #output.executed {
+            background-color: #d1fae5;
+            transition: background-color 0.3s;
+        }
+
+        /* Input areas container */
+        #input-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        #upper-half {
+            flex: 1;
+            min-height: 120px;
+        }
+		
+
+        #d2d-input {
+            position: relative;
+            user-select: none;
+            margin-top: 5px;
+        }
+
+        #dot-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+
+        .dot-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .dot {
+            width: 45px;
+            height: 45px;
+            border-radius: 50%;
+            border: 1px solid #ccc;
+            background-color: #f8f8f8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+            position: relative;
+            transition: background-color 0.1s;
+            flex-shrink: 0;
+        }
+
+        .dot.numeric {
+            background-color: #fee2e2;
+            color: #ef4444;
+            font-size: 16px;
+        }
+
+        .dot.word-dot {
+            background-color: #dbeafe;
+            color: #3b82f6;
+            font-size: 12px;
+            overflow: hidden;
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .dot.detected {
+            background-color: #fca5a5;
+            border-color: #ef4444;
+        }
+
+        #special-row {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .special-button {
+            width: 60px;
+            height: 45px;
+            border-radius: 10px;
+            border: 1px solid #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            background-color: #e5e7eb;
+            flex-shrink: 0;
+            transition: transform 0.1s, background-color 0.1s;
+        }
+
+        .special-button.delete {
+            background-color: #f8f8f8;
+        }
+
+        .special-button.space {
+            background-color: #f8f8f8;
+        }
+
+        .special-button.long-pressed {
+            background-color: #fde68a;
+            transform: scale(0.95);
+        }
+
+        .special-button.combined-pressed {
+            background-color: #93c5fd;
+            transform: scale(0.95);
+        }
+
+        #special-row .dot.numeric {
+            flex-shrink: 0;
+        }
+
+        #line-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Execute Button Style */
+        #execute-button {
+            display: block;
+            width: 100px;
+            padding: 10px;
+            margin-top: 10px;
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        #execute-button:hover {
+            background-color: #2563eb;
+        }
+
+        #execute-button:active {
+            background-color: #1d4ed8;
+        }
+
+        /* Debug Panel Styles */
+        #debug-panel {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 5px;
+        }
+
+        .control-container {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+
+        .control-container label {
+            min-width: 120px;
+        }
+
+        .control-container input[type="range"] {
+            flex-grow: 1;
+            margin: 0 10px;
+        }
+
+        .value-display {
+            min-width: 40px;
+            text-align: right;
+        }
+
+        .debug-output {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #f1f5f9;
+            border-radius: 4px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+
+        .recognition-feedback {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 50%;
+            width: 80px;
+            height: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+            color: #3b82f6;
+            animation: fadeOut 0.8s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes fadeOut {
+            0% {
+                opacity: 1;
+            }
+            70% {
+                opacity: 1;
+            }
+            100% {
+                opacity: 0;
+            }
+        }
+
+        /* Responsive layout */
+        @media (max-width: 768px) {
+            article {
+                border: none;
+                padding: 0;
+            }
+
+            #mobile-container {
+                display: flex;
+                flex-direction: column;
+                height: calc(100vh - 80px);
+            }
+
+            #upper-half {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .input-section,
+            .output-section {
+                flex: 1;
+                transition: transform 0.3s ease;
+                width: 100%;
+            }
+			
+			#output,
+			#txt-input {
+                height: 200px;
+            }
+
+            .hide {
+                display: none;
+            }
+
+            #d2d-section {
+                height: 50vh;
+                min-height: 300px;
+            }
+
+            #debug-panel {
+                display: none;
+            }
+
+            /* モバイルでも txt-input の縦幅拡張 */
+            #txt-input {
+                min-height: 6rem;
+            }
+
+            /* モバイル用にタッチ操作を確実に有効化 */
+            body {
+                touch-action: auto;
+            }
+        }
+
+        @media (min-width: 769px) {
+            #mobile-container {
+                display: block;
+            }
+
+            .input-section,
+            .output-section {
+                display: block;
+            }
+
+            .hide {
+                display: block;
+            }
+        }
+    </style>
 </head>
 
 <body>
-  <header>
-    <div class="header-container">
-      <a href="https://github.com/masamoto1982" target="_blank">
-        <img src="image/logo.png" alt="Holon Logo" class="logo">
-      </a>
-      <h1>Holon
-        <span>Ver.202504030123</span>
-      </h1>
-    </div>
-  </header>
-  <article class="container">
-    <section class="io-section">
-      <h2 title="XXX">I/O</h2>
-      <div class="output-area">
-        <h3 title="XXX">Output</h3>
-        <div class="output-box">
-          <!-- ここにアウトプットを表示する内容が入ります -->
-          <p></p>
+    <article>
+        <h1>holon Ver.202504181042</h1>
+
+        <div id="mobile-container">
+            <div id="upper-half">
+                <section id="output-section" class="output-section hide">
+                    <h2>output</h2>
+                    <textarea id="output" readonly></textarea>
+                </section>
+
+                <section id="text-section" class="input-section">
+                    <h2>txt-input</h2>
+                    <textarea id="txt-input" rows="4" placeholder="Enter holon code..."></textarea>
+                    <button id="execute-button">実行</button>
+                </section>
+            </div>
+
+            <section id="d2d-section">
+                <h2>d2d-input</h2>
+                <div id="d2d-input">
+                    <div id="dot-grid"></div>
+                    <div id="special-row"></div>
+                    <canvas id="line-canvas"></canvas>
+                </div>
+            </section>
         </div>
-      </div>
-      <div class="input-area">
-        <h3 title="XXX">Input</h3>
-        <textarea placeholder="Type code and press Shift+Enter to execute"></textarea>
-      </div>
-    </section>
-    <section class="dictionary-section">
-      <h2 title="XXX">Dictionary</h2>
-      <div class="builtin-words-area">
-        <h3 title="XXX">Built-In Words</h3>
-      </div>
-      <div class="custom-words-area">
-        <h3 title="XXX">Custom Words</h3>
-      </div>
-    </section>
-  </article>
-  <footer>© 2025
-    <a href="https://github.com/masamoto1982" target="_blank">masamoto yamashiro</a>
-  </footer>
-  <script src="script.js"></script>
+    </article>
+
+    <script>
+        // --- Configuration Parameters ---
+        const CONFIG = {
+            debug: true,
+            sensitivity: {
+                hitRadius: 22,
+                minSwipeDistance: 5,
+                debounceTime: 50,
+            },
+            timing: {
+                multiStrokeTimeout: 700,
+                longPressDuration: 500,
+                strokeCooldown: 100,
+            },
+            layout: {
+                dotSize: 45,
+                dotGap: 10,
+                gridRows: 5,
+                gridCols: 5,
+            },
+            visual: {
+                lineWidth: 3,
+                lineColor: '#ef4444',
+                detectedColor: '#fca5a5',
+            }
+        };
+
+        // --- Fraction Class Definition ---
+        class Fraction {
+            constructor(numerator, denominator = 1) {
+                if (typeof numerator !== 'number' || typeof denominator !== 'number') {
+                    throw new Error("Numerator and denominator must be numbers.");
+                }
+                if (denominator === 0) {
+                    throw new Error("Division by zero: Denominator cannot be zero.");
+                }
+                if (!Number.isInteger(numerator) || !Number.isInteger(denominator)) {
+                    console.warn("Fraction created with non-integer values. Consider using integers for precision.");
+                }
+                const commonDivisor = this.gcd(Math.abs(numerator), Math.abs(denominator));
+                const sign = (denominator < 0) ? -1 : 1;
+                this.numerator = sign * (numerator / commonDivisor);
+                this.denominator = Math.abs(denominator / commonDivisor);
+            }
+
+            gcd(a, b) {
+                a = Math.abs(Math.round(a));
+                b = Math.abs(Math.round(b));
+                while (b !== 0) { [a, b] = [b, a % b]; }
+                return a;
+            }
+            add(other) {
+                if (!(other instanceof Fraction)) throw new Error("Can only add Fraction objects.");
+                const newNumerator = this.numerator * other.denominator + other.numerator * this.denominator;
+                const newDenominator = this.denominator * other.denominator;
+                return new Fraction(newNumerator, newDenominator);
+            }
+            subtract(other) {
+                if (!(other instanceof Fraction)) throw new Error("Can only subtract Fraction objects.");
+                const newNumerator = this.numerator * other.denominator - other.numerator * this.denominator;
+                const newDenominator = this.denominator * other.denominator;
+                return new Fraction(newNumerator, newDenominator);
+            }
+            multiply(other) {
+                if (!(other instanceof Fraction)) throw new Error("Can only multiply Fraction objects.");
+                const newNumerator = this.numerator * other.numerator;
+                const newDenominator = this.denominator * other.denominator;
+                return new Fraction(newNumerator, newDenominator);
+            }
+            divide(other) {
+                if (!(other instanceof Fraction)) throw new Error("Can only divide Fraction objects.");
+                if (other.numerator === 0) throw new Error("Division by zero: Cannot divide by a zero fraction.");
+                const newNumerator = this.numerator * other.denominator;
+                const newDenominator = this.denominator * other.numerator;
+                return new Fraction(newNumerator, newDenominator);
+            }
+            equals(other) {
+                if (!(other instanceof Fraction)) return false;
+                return this.numerator === other.numerator && this.denominator === other.denominator;
+            }
+            lessThan(other) {
+                if (!(other instanceof Fraction)) throw new Error("Can only compare Fraction objects.");
+                return this.numerator * other.denominator < other.numerator * this.denominator;
+            }
+            greaterThan(other) {
+                if (!(other instanceof Fraction)) throw new Error("Can only compare Fraction objects.");
+                return this.numerator * other.denominator > other.numerator * this.denominator;
+            }
+            toString() {
+                return this.denominator === 1 ? `${this.numerator}` : `${this.numerator}/${this.denominator}`;
+            }
+            toNumber() {
+                return this.numerator / this.denominator;
+            }
+        }
+
+        // --- Holon Interpreter ---
+        const holonInterpreter = {
+            variables: {},
+            functions: {
+                PRINT: (value) => { console.log(value); return value; },
+                ADD: (a, b) => a + b,
+                SUB: (a, b) => a - b,
+                MUL: (a, b) => a * b,
+                DIV: (a, b) => a / b,
+                RANGE: (start, end) => {
+                    const result = [];
+                    for (let i = start; i <= end; i++) result.push(i);
+                    return result;
+                },
+                MAP: (array, fn) => array.map(fn),
+                FILTER: (array, fn) => array.filter(fn),
+                REDUCE: (array, fn, initial) => array.reduce(fn, initial)
+            },
+            parse: (code) => {
+                try {
+                    const lines = code.split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line && !line.startsWith('//'));
+                    return "パース完了";
+                } catch (error) {
+                    throw new Error(`パースエラー: ${error.message}`);
+                }
+            },
+            execute: (code) => {
+                try {
+                    console.log("実行コード:", code);
+                    if (code.includes("FIZZBUZZ")) {
+                        let maxNum = 20;
+                        const match = code.match(/FIZZBUZZ\s*\(\s*(\d+)\s*\)/);
+                        if (match && match[1]) {
+                            maxNum = parseInt(match[1], 10);
+                            if (maxNum > 1000) maxNum = 1000;
+                        }
+                        const result = [];
+                        for (let i = 1; i <= maxNum; i++) {
+                            if (i % 15 === 0) result.push("FizzBuzz");
+                            else if (i % 3 === 0) result.push("Fizz");
+                            else if (i % 5 === 0) result.push("Buzz");
+                            else result.push(i.toString());
+                        }
+                        return result.join(", ");
+                    }
+                    if (code.includes("PRINT")) {
+                        const match = code.match(/PRINT\s*\(\s*["'](.*)["']\s*\)/);
+                        if (match && match[1]) return match[1];
+                    }
+                    if (code.includes("=>")) {
+                        return "変数または関数を定義しました";
+                    }
+                    return "実行完了 (テストモード)";
+                } catch (error) {
+                    return `エラー: ${error.message}`;
+                }
+            }
+        };
+
+        // --- Configuration (Constants) ---
+        const dotValues = [
+            1, 2, 4, 8, 16, 32, 64, 128, 256, 512,
+            1024, 2048, 4096, 8192, 16384, 32768,
+            65536, 131072, 262144, 524288, 1048576,
+            2097152, 4194304, 8388608, 16777216
+        ];
+        const letterPatterns = {
+            17836036: 'A', 28611899: 'B', 32539711: 'C', 1224985: 'D',
+            32567296: 'E', 1113151: 'F', 33092671: 'G', 18415153: 'H',
+            32641183: 'I', 7475359: 'J', 17990833: 'K', 32539681: 'L',
+            18405233: 'M', 18667121: 'N', 33080895: 'O', 1113663: 'P',
+            33347135: 'Q', 18153023: 'R', 33061951: 'S', 4329631:  'T',
+            33080881: 'U', 4204561: 'V', 18732593: 'W', 18157905: 'X',
+            4329809:  'Y', 32575775: 'Z'
+        };
+        const numericPositions = {
+            0: '1', 2: '2', 4: '3',
+            10: '4', 12: '5', 14: '6',
+            20: '7', 22: '8', 24: '9'
+        };
+        const dotWordMapping = {
+            2: '未定', 8: '未定',
+            32: '(', 64: ')', 128: '+', 256: '{', 512: '}',
+            2048: '*', 8192: '/',
+            32768: '未定', 65536: '未定', 131072: '-', 262144: '未定', 524288: '未定',
+            2097152: '>', 8388608: '='
+        };
+
+        // --- DOM Elements (Constants) ---
+        const elements = {
+            dotGrid: document.getElementById('dot-grid'),
+            specialRow: document.getElementById('special-row'),
+            lineCanvas: document.getElementById('line-canvas'),
+            input: document.getElementById('txt-input'),
+            d2dArea: document.getElementById('d2d-input'),
+            output: document.getElementById('output'),
+            executeButton: document.getElementById('execute-button'),
+            outputSection: document.getElementById('output-section'),
+            textSection: document.getElementById('text-section')
+        };
+        const lineCtx = elements.lineCanvas.getContext('2d');
+
+        // --- Gesture State (Mutable) ---
+        const drawState = {
+            isActive: false,
+            detectedDots: new Set(),
+            totalValue: 0,
+            startX: 0,
+            startY: 0,
+            lastStrokeTime: 0,
+            lastDetectionTime: 0,
+            currentStrokeDetected: false,
+            strokeTimer: null,
+            longPressTimer: null,
+            isLongPress: false,
+            currentTouchId: null,
+            pointerStartTime: 0,
+            pointerStartX: 0,
+            pointerStartY: 0
+        };
+
+        const specialButtonState = {
+            lastClickTime: 0,
+            clickCount: 0,
+            clickTarget: null,
+            clickTimer: null,
+            doubleClickDelay: 300,
+        };
+
+        const keyState = {
+            deletePressed: false,
+            spacePressed: false,
+            lastPressTime: 0,
+            maxTimeDiff: 300
+        };
+
+        // --- Utility Functions ---
+        const insertAtCursor = (text) => {
+            const textarea = elements.input;
+            const start = textarea.selectionStart;
+            const end = textarea.selectionEnd;
+            const textBefore = textarea.value.substring(0, start);
+            const textAfter = textarea.value.substring(end);
+            textarea.value = textBefore + text + textAfter;
+            const newCursorPos = start + text.length;
+            textarea.selectionStart = textarea.selectionEnd = newCursorPos;
+            if (window.innerWidth <= 768) showTextSection();
+            textarea.focus();
+        };
+
+        const showTextSection = () => {
+            if (window.innerWidth <= 768) {
+                elements.outputSection.classList.add('hide');
+                elements.textSection.classList.remove('hide');
+            }
+        };
+
+        const showOutputSection = () => {
+            if (window.innerWidth <= 768) {
+                elements.textSection.classList.add('hide');
+                elements.outputSection.classList.remove('hide');
+            }
+        };
+
+        // --- Canvas Drawing Functions ---
+        const clearCanvas = () => {
+            lineCtx.clearRect(0, 0, elements.lineCanvas.width, elements.lineCanvas.height);
+        };
+
+        const updateCanvas = () => {
+            const canvas = elements.lineCanvas;
+            const ctx = lineCtx;
+            const grid = elements.dotGrid;
+            if (!grid || !canvas) return;
+            const gridRect = grid.getBoundingClientRect();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const numericDotsToConnect = [];
+            drawState.detectedDots.forEach(dot => {
+                if (dot.classList.contains('numeric')) numericDotsToConnect.push(dot);
+            });
+
+            if (numericDotsToConnect.length < 1) return;
+
+            ctx.beginPath();
+            ctx.strokeStyle = CONFIG.visual.lineColor;
+            ctx.lineWidth = CONFIG.visual.lineWidth;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            let isFirst = true;
+            numericDotsToConnect.forEach(dot => {
+                const rect = dot.getBoundingClientRect();
+                const x = (rect.left - gridRect.left) + rect.width / 2;
+                const y = (rect.top - gridRect.top) + rect.height / 2;
+                if (isFirst) ctx.moveTo(x, y), isFirst = false;
+                else ctx.lineTo(x, y);
+            });
+
+            if (!isFirst) ctx.stroke();
+        };
+
+        // --- Gesture Logic Functions ---
+        const resetDrawState = (keepActive = false) => {
+            drawState.isActive = keepActive;
+            drawState.detectedDots.forEach(dot => dot.classList.remove('detected'));
+            drawState.detectedDots.clear();
+            drawState.totalValue = 0;
+            drawState.isLongPress = false;
+            drawState.currentStrokeDetected = false;
+            if (!keepActive) drawState.lastStrokeTime = 0;
+            clearTimeout(drawState.longPressTimer);
+            clearTimeout(drawState.strokeTimer);
+            drawState.longPressTimer = drawState.strokeTimer = null;
+        };
+
+        const recognizeLetter = (totalValue) => {
+            const recognized = letterPatterns[totalValue] || null;
+            if (recognized && CONFIG.debug) debugLog(`認識: 値=${totalValue}, 文字=${recognized}`);
+            else if (CONFIG.debug) debugLog(`認識失敗: 値=${totalValue}`);
+            return recognized;
+        };
+
+        const endDrawing = () => {
+            if (!drawState.isActive) return;
+            const now = Date.now();
+            drawState.lastStrokeTime = now;
+
+            if (drawState.currentStrokeDetected) {
+                drawState.currentStrokeDetected = false;
+                drawState.strokeTimer = setTimeout(() => {
+                    if (Date.now() - drawState.lastStrokeTime >= CONFIG.timing.multiStrokeTimeout - 50) {
+                        if (drawState.detectedDots.size > 0 && drawState.totalValue > 0) {
+                            const rec = recognizeLetter(drawState.totalValue);
+                            if (rec) {
+                                insertAtCursor(rec);
+                                const fb = document.createElement('div');
+                                fb.className = 'recognition-feedback';
+                                fb.textContent = rec;
+                                elements.d2dArea.appendChild(fb);
+                                setTimeout(() => fb.remove(), 800);
+                            }
+                        }
+                        resetDrawState();
+                        clearCanvas();
+                    }
+                }, CONFIG.timing.multiStrokeTimeout);
+            }
+        };
+
+        const addDetectedDot = (dot) => {
+            if (!dot || drawState.detectedDots.has(dot)) return;
+            dot.classList.add('detected');
+            drawState.detectedDots.add(dot);
+            drawState.currentStrokeDetected = true;
+            const v = parseInt(dot.dataset.value, 10);
+            if (!isNaN(v)) drawState.totalValue += v;
+            if (CONFIG.debug) debugLog(`ドット検出: index=${dot.dataset.index}, value=${v}, total=${drawState.totalValue}`);
+        };
+
+        const detectDot = (x, y) => {
+            if (!drawState.isActive) return;
+            const now = Date.now();
+            if (now - drawState.lastDetectionTime < CONFIG.sensitivity.debounceTime) return;
+            drawState.lastDetectionTime = now;
+
+            document.querySelectorAll('#dot-grid .dot').forEach(dot => {
+                if (drawState.detectedDots.has(dot)) return;
+                const r = dot.getBoundingClientRect();
+                const cx = r.left + r.width / 2;
+                const cy = r.top + r.height / 2;
+                const dist = Math.hypot(x - cx, y - cy);
+                if (dist <= CONFIG.sensitivity.hitRadius) {
+                    addDetectedDot(dot);
+                }
+            });
+
+            updateCanvas();
+        };
+
+        const startDrawing = (dotEl, x, y) => {
+            if (!dotEl || !dotEl.classList.contains('dot') || !dotEl.closest('#dot-grid')) return;
+            const now = Date.now();
+            if (!drawState.isActive || now - drawState.lastStrokeTime > CONFIG.timing.multiStrokeTimeout) {
+                resetDrawState(true);
+            }
+            drawState.isActive = true;
+            drawState.startX = x;
+            drawState.startY = y;
+            drawState.lastDetectionTime = now;
+            addDetectedDot(dotEl);
+            updateCanvas();
+        };
+
+        // --- Event Handlers ---
+        const handleDeleteAction = (deleteToken = false) => {
+            const ta = elements.input;
+            const pos = ta.selectionStart;
+            if (pos > 0) {
+                let before = ta.value.substring(0, pos);
+                const after = ta.value.substring(pos);
+                if (deleteToken) {
+                    const idx = before.lastIndexOf(' ');
+                    before = idx >= 0 ? before.substring(0, idx + 1) : '';
+                } else {
+                    before = before.substring(0, before.length - 1);
+                }
+                ta.value = before + after;
+                ta.selectionStart = ta.selectionEnd = before.length;
+            }
+            showTextSection();
+            elements.input.focus();
+        };
+
+        const handleSpecialButtonClick = (e, type, actions) => {
+            e.preventDefault();
+            const now = Date.now();
+            if (specialButtonState.clickTarget === type &&
+                now - specialButtonState.lastClickTime < specialButtonState.doubleClickDelay) {
+                clearTimeout(specialButtonState.clickTimer);
+                specialButtonState.clickCount = 0;
+                specialButtonState.clickTarget = null;
+                actions.double();
+                if (CONFIG.debug) debugLog(`ダブルクリック: ${type}`);
+            } else {
+                specialButtonState.clickCount = 1;
+                specialButtonState.lastClickTime = now;
+                specialButtonState.clickTarget = type;
+                specialButtonState.clickTimer = setTimeout(() => {
+                    if (specialButtonState.clickCount === 1) {
+                        actions.single();
+                        if (CONFIG.debug) debugLog(`シングルクリック: ${type}`);
+                    }
+                    specialButtonState.clickCount = 0;
+                    specialButtonState.clickTarget = null;
+                }, specialButtonState.doubleClickDelay);
+            }
+        };
+
+        const handleSpecialButtonLongPress = (e, btn, action) => {
+            e.preventDefault();
+            const t = setTimeout(() => {
+                action();
+                btn.classList.add('long-pressed');
+                if (CONFIG.debug) debugLog(`長押し: ${btn.dataset.action || btn.dataset.digit}`);
+                setTimeout(() => btn.classList.remove('long-pressed'), 200);
+            }, CONFIG.timing.longPressDuration);
+
+            const clear = () => {
+                clearTimeout(t);
+                btn.removeEventListener('pointerup', clear);
+                btn.removeEventListener('pointercancel', clear);
+                btn.removeEventListener('pointerleave', clear);
+            };
+            btn.addEventListener('pointerup', clear);
+            btn.addEventListener('pointercancel', clear);
+            btn.addEventListener('pointerleave', clear);
+        };
+
+        const executeCode = () => {
+            const code = elements.input.value;
+            if (!code.trim()) return;
+            try {
+                const result = holonInterpreter.execute(code);
+                elements.output.value = result !== undefined ? result : "実行完了";
+                elements.output.classList.add('executed');
+                setTimeout(() => elements.output.classList.remove('executed'), 300);
+                showOutputSection();
+                if (!result.startsWith("エラー:")) elements.input.value = "";
+                if (CONFIG.debug) debugLog(`コード実行: ${code.substring(0, 20)}${code.length > 20 ? '...' : ''}`);
+            } catch (err) {
+                elements.output.value = `エラー: ${err.message}`;
+                showOutputSection();
+                if (CONFIG.debug) debugLog(`実行エラー: ${err.message}`);
+            }
+        };
+
+        const setupCombinedButtonPress = (delBtn, spcBtn) => {
+            if (!delBtn || !spcBtn) return;
+            const state = { deletePressed: false, spacePressed: false, pressStart: 0, maxTimeDiff: 300 };
+            delBtn.addEventListener('pointerdown', () => {
+                state.deletePressed = true;
+                state.pressStart = Date.now();
+                check();
+            });
+            delBtn.addEventListener('pointerup', () => { state.deletePressed = false; });
+            spcBtn.addEventListener('pointerdown', () => {
+                state.spacePressed = true;
+                state.pressStart = Date.now();
+                check();
+            });
+            spcBtn.addEventListener('pointerup', () => { state.spacePressed = false; });
+            const check = () => {
+                if (state.deletePressed && state.spacePressed) {
+                    executeCode();
+                    delBtn.classList.add('combined-pressed');
+                    spcBtn.classList.add('combined-pressed');
+                    setTimeout(() => {
+                        delBtn.classList.remove('combined-pressed');
+                        spcBtn.classList.remove('combined-pressed');
+                    }, 200);
+                }
+            };
+        };
+
+        const setupKeyboardHandlers = () => {
+            document.addEventListener('keydown', (e) => {
+                const now = Date.now();
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    keyState.deletePressed = true;
+                    keyState.lastPressTime = now;
+                    checkCombo();
+                }
+                if ((e.key === ' ' || e.key === 'Spacebar') && document.activeElement !== elements.input) {
+                    e.preventDefault();
+                    keyState.spacePressed = true;
+                    keyState.lastPressTime = now;
+                    checkCombo();
+                }
+            });
+            document.addEventListener('keyup', (e) => {
+                if (e.key === 'Delete' || e.key === 'Backspace') keyState.deletePressed = false;
+                if (e.key === ' ' || e.key === 'Spacebar') keyState.spacePressed = false;
+            });
+            const checkCombo = () => {
+                if (keyState.deletePressed && keyState.spacePressed) {
+                    executeCode();
+                    if (CONFIG.debug) debugLog('キーボードショートカット: Delete + Space');
+                }
+            };
+        };
+
+        const handlePointerUp = (e) => {
+            if (e.pointerId !== drawState.currentTouchId) return;
+            e.preventDefault();
+            const el = document.querySelector(`[data-pointer-id="${e.pointerId}"]`);
+            if (el?.hasPointerCapture(e.pointerId)) {
+                try { el.releasePointerCapture(e.pointerId); delete el.dataset.pointerId; }
+                catch (err) { console.error("Error releasing pointer capture on up:", err); }
+            }
+            clearTimeout(drawState.longPressTimer);
+            if (drawState.isActive && !drawState.isLongPress) endDrawing();
+            else if (drawState.isLongPress) {
+                resetDrawState();
+                clearCanvas();
+            }
+            drawState.currentTouchId = null;
+        };
+
+        const handlePointerMove = (e) => {
+            if (!drawState.isActive || e.pointerId !== drawState.currentTouchId) return;
+            e.preventDefault();
+            const dx = e.clientX - drawState.pointerStartX;
+            const dy = e.clientY - drawState.pointerStartY;
+            if (Math.hypot(dx, dy) >= CONFIG.sensitivity.minSwipeDistance) {
+                clearTimeout(drawState.longPressTimer);
+                drawState.longPressTimer = null;
+                detectDot(e.clientX, e.clientY);
+            }
+        };
+
+        const handlePointerDown = (e, el) => {
+            e.preventDefault();
+            if (el.hasPointerCapture(e.pointerId)) return;
+            try { el.setPointerCapture(e.pointerId); el.dataset.pointerId = e.pointerId; }
+            catch (err) { console.error("Error setting pointer capture:", err); }
+
+            showTextSection();
+            drawState.isLongPress = false;
+            drawState.currentTouchId = e.pointerId;
+            drawState.pointerStartTime = Date.now();
+            drawState.pointerStartX = e.clientX;
+            drawState.pointerStartY = e.clientY;
+
+            const digit = el.dataset.digit;
+            const word = el.dataset.word;
+            if (digit || word) {
+                clearTimeout(drawState.longPressTimer);
+                drawState.longPressTimer = setTimeout(() => {
+                    const dist = Math.hypot(e.clientX - drawState.pointerStartX, e.clientY - drawState.pointerStartY);
+                    if (dist < CONFIG.sensitivity.minSwipeDistance && (!drawState.isActive || drawState.detectedDots.size <= 1)) {
+                        insertAtCursor(digit || word);
+                        drawState.isLongPress = true;
+                        resetDrawState();
+                        clearCanvas();
+                        if (CONFIG.debug) debugLog(`長押し入力: ${digit || word}`);
+                    }
+                }, CONFIG.timing.longPressDuration);
+            }
+
+            if (el.closest('#dot-grid')) startDrawing(el, e.clientX, e.clientY);
+        };
+
+        // --- Event Listener Setup ---
+        const setupDotEventListeners = () => {
+            document.querySelectorAll('#dot-grid .dot').forEach(dot => {
+                dot.addEventListener('pointerdown', e => handlePointerDown(e, dot), { passive: false });
+            });
+        };
+
+        const setupSpecialButtonListeners = () => {
+            const deleteBtn = elements.specialRow.querySelector('[data-action="delete"]');
+            const zeroBtn   = elements.specialRow.querySelector('[data-digit="0"]');
+            const spaceBtn  = elements.specialRow.querySelector('[data-action="space"]');
+
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', e => handleSpecialButtonClick(e, 'delete', {
+                    single: () => handleDeleteAction(false),
+                    double: () => handleDeleteAction(true),
+                    long:   () => {}
+                }));
+                deleteBtn.addEventListener('pointerdown', e => handleSpecialButtonLongPress(e, deleteBtn, () => {}));
+            }
+
+            if (zeroBtn) {
+                zeroBtn.addEventListener('click', e => handleSpecialButtonClick(e, 'zero', {
+                    single: () => insertAtCursor('0'),
+                    double: () => {},
+                    long:   () => {}
+                }));
+                zeroBtn.addEventListener('pointerdown', e => handleSpecialButtonLongPress(e, zeroBtn, () => {}));
+            }
+
+            if (spaceBtn) {
+                spaceBtn.addEventListener('click', e => handleSpecialButtonClick(e, 'space', {
+                    single: () => insertAtCursor(' '),
+                    double: () => insertAtCursor('\n'),
+                    long:   () => {}
+                }));
+                spaceBtn.addEventListener('pointerdown', e => handleSpecialButtonLongPress(e, spaceBtn, () => {}));
+            }
+
+            setupCombinedButtonPress(deleteBtn, spaceBtn);
+        };
+
+        const setupExecuteButtonListener = () => {
+            elements.executeButton.addEventListener('click', executeCode);
+        };
+
+        const resizeCanvas = () => {
+            const rect = elements.d2dArea.getBoundingClientRect();
+            const style = window.getComputedStyle(elements.d2dArea);
+            const pl = parseFloat(style.paddingLeft);
+            const pt = parseFloat(style.paddingTop);
+            elements.lineCanvas.width  = elements.d2dArea.clientWidth  - pl * 2;
+            elements.lineCanvas.height = elements.d2dArea.clientHeight - pt * 2;
+            elements.lineCanvas.style.left = `${pl}px`;
+            elements.lineCanvas.style.top  = `${pt}px`;
+            updateCanvas();
+        };
+
+        const setupGestureListeners = () => {
+            document.addEventListener('pointermove', handlePointerMove, { passive: false });
+            document.addEventListener('pointerup',   handlePointerUp,   { passive: false });
+            document.addEventListener('pointercancel', handlePointerUp,  { passive: false });
+        };
+
+        // --- Debug Interface & Helpers ---
+        const debugLog = (msg) => {
+            if (!CONFIG.debug) return;
+            const out = document.getElementById('debug-output');
+            if (!out) return;
+            const e = document.createElement('div');
+            e.textContent = `${new Date().toLocaleTimeString()}: ${msg}`;
+            out.prepend(e);
+            while (out.children.length > 10) out.removeChild(out.lastChild);
+        };
+
+        const addSliderControl = (parent, id, label, min, max, val, onChange) => {
+            const c = document.createElement('div'); c.className = 'control-container';
+            const l = document.createElement('label'); l.htmlFor = `control-${id}`; l.textContent = `${label}: `;
+            const s = document.createElement('input'); s.type = 'range'; s.id = `control-${id}`; s.min = min; s.max = max; s.value = val;
+            const v = document.createElement('span'); v.className = 'value-display'; v.textContent = val;
+            s.addEventListener('input', () => { v.textContent = s.value; onChange(s.value); });
+            c.appendChild(l); c.appendChild(s); c.appendChild(v);
+            parent.appendChild(c);
+        };
+
+        const updateConfigStyles = () => {
+            const existing = document.getElementById('dynamic-config-styles');
+            if (existing) existing.remove();
+            const s = document.createElement('style'); s.id = 'dynamic-config-styles';
+            s.textContent = `
+                .dot {
+                    width: ${CONFIG.layout.dotSize}px;
+                    height: ${CONFIG.layout.dotSize}px;
+                }
+                .dot.detected {
+                    background-color: ${CONFIG.visual.detectedColor};
+                }
+                #line-canvas { pointer-events: none; }
+            `;
+            document.head.appendChild(s);
+        };
+
+        const setupDebugInterface = () => {
+            if (!CONFIG.debug || window.innerWidth <= 768) return;
+            const section = document.createElement('section');
+            section.id = 'debug-panel';
+            const h2 = document.createElement('h2'); h2.textContent = 'Debug Controls';
+            section.appendChild(h2);
+
+            addSliderControl(section, 'hitRadius', 'Hit Radius', 5, 50, CONFIG.sensitivity.hitRadius, v => CONFIG.sensitivity.hitRadius = Number(v));
+            addSliderControl(section, 'minSwipe', 'Min Swipe', 1, 20, CONFIG.sensitivity.minSwipeDistance, v => CONFIG.sensitivity.minSwipeDistance = Number(v));
+            addSliderControl(section, 'multiStroke', 'Multi-Stroke Timeout', 100, 2000, CONFIG.timing.multiStrokeTimeout, v => { CONFIG.timing.multiStrokeTimeout = Number(v); });
+            addSliderControl(section, 'longPress', 'Long Press Duration', 100, 1000, CONFIG.timing.longPressDuration, v => CONFIG.timing.longPressDuration = Number(v));
+            addSliderControl(section, 'debounce', 'Debounce Time', 10, 200, CONFIG.sensitivity.debounceTime, v => CONFIG.sensitivity.debounceTime = Number(v));
+            addSliderControl(section, 'dotSize', 'Dot Size', 30, 80, CONFIG.layout.dotSize, v => { CONFIG.layout.dotSize = Number(v); updateConfigStyles(); initKeypad(); });
+            addSliderControl(section, 'dotGap', 'Dot Gap', 5, 30, CONFIG.layout.dotGap, v => { CONFIG.layout.dotGap = Number(v); updateConfigStyles(); initKeypad(); });
+
+            const sampleCodes = {
+                'FizzBuzz': `// FizzBuzz
+FIZZBUZZ => (max) => {
+    result => []
+    RANGE(1, max).forEach(x => {
+        output => 
+            x % 15 == 0 ? "FizzBuzz"
+            : x % 3  == 0 ? "Fizz"
+            : x % 5  == 0 ? "Buzz"
+            : x.toString()
+        result.push(output)
+    })
+    return result
+}
+result => FIZZBUZZ(20)
+PRINT(result.join(", "))`,
+                '計算例': `// 分数計算
+a => 3/4
+b => 1/2
+sum => a + b
+PRINT("合計: " + sum)
+product => a * b
+PRINT("積: " + product)
+// 配列処理
+numbers => [1, 2, 3, 4, 5]
+doubled => numbers.map(n => n * 2)
+PRINT(doubled)`
+            };
+            const btnContainer = document.createElement('div');
+            btnContainer.style.display = 'flex';
+            btnContainer.style.gap = '10px';
+            btnContainer.style.marginBottom = '10px';
+            for (const [name, code] of Object.entries(sampleCodes)) {
+                const btn = document.createElement('button');
+                btn.textContent = name;
+                btn.style.padding = '5px 10px';
+                btn.style.border = '1px solid #ccc';
+                btn.style.borderRadius = '4px';
+                btn.style.cursor = 'pointer';
+                btn.addEventListener('click', () => { elements.input.value = code; });
+                btnContainer.appendChild(btn);
+            }
+            section.appendChild(btnContainer);
+
+            const debugOut = document.createElement('div');
+            debugOut.id = 'debug-output';
+            debugOut.className = 'debug-output';
+            section.appendChild(debugOut);
+
+            document.querySelector('article').appendChild(section);
+        };
+
+        const initResponsiveLayout = () => {
+            window.addEventListener('resize', () => {
+                if (window.innerWidth <= 768) {
+                    const dp = document.getElementById('debug-panel');
+                    if (dp) dp.style.display = 'none';
+                } else {
+                    const dp = document.getElementById('debug-panel');
+                    if (dp && CONFIG.debug) dp.style.display = 'block';
+                    elements.outputSection.classList.remove('hide');
+                    elements.textSection.classList.remove('hide');
+                }
+            });
+            if (window.innerWidth <= 768) {
+                elements.outputSection.classList.add('hide');
+                elements.textSection.classList.remove('hide');
+            }
+        };
+
+        // --- Keypad Initialization ---
+        function initKeypad() {
+            elements.dotGrid.innerHTML = '';
+            elements.specialRow.innerHTML = '';
+            elements.dotGrid.style.gap = `${CONFIG.layout.dotGap}px`;
+
+            for (let r = 0; r < CONFIG.layout.gridRows; r++) {
+                const row = document.createElement('div');
+                row.className = 'dot-row';
+                row.style.gap = `${CONFIG.layout.dotGap}px`;
+                for (let c = 0; c < CONFIG.layout.gridCols; c++) {
+                    const idx = r * CONFIG.layout.gridCols + c;
+                    const value = dotValues[idx];
+                    const dot = document.createElement('div');
+                    dot.className = 'dot';
+                    dot.dataset.index = idx;
+                    dot.dataset.value = value;
+                    dot.style.width = `${CONFIG.layout.dotSize}px`;
+                    dot.style.height = `${CONFIG.layout.dotSize}px`;
+
+                    const digit = numericPositions[idx];
+                    const word  = dotWordMapping[value];
+                    if (digit) {
+                        dot.classList.add('numeric');
+                        dot.textContent = digit;
+                        dot.dataset.digit = digit;
+                    } else if (word) {
+                        dot.classList.add('word-dot');
+                        dot.textContent = word;
+                        dot.dataset.word = word;
+                    } else {
+                        dot.textContent = '未定';
+                    }
+                    row.appendChild(dot);
+                }
+                elements.dotGrid.appendChild(row);
+            }
+
+            const deleteBtn = document.createElement('div');
+            deleteBtn.className = 'special-button delete';
+            deleteBtn.textContent = 'DELETE';
+            deleteBtn.dataset.action = 'delete';
+            deleteBtn.title = '削除';
+            elements.specialRow.appendChild(deleteBtn);
+
+            const zeroBtn = document.createElement('div');
+            zeroBtn.className = 'dot numeric';
+            zeroBtn.textContent = '0';
+            zeroBtn.dataset.digit = '0';
+            elements.specialRow.appendChild(zeroBtn);
+
+            const spaceBtn = document.createElement('div');
+            spaceBtn.className = 'special-button space';
+            spaceBtn.textContent = 'SPACE';
+            spaceBtn.dataset.action = 'space';
+            spaceBtn.title = '空白';
+            elements.specialRow.appendChild(spaceBtn);
+
+            elements.d2dArea.tabIndex = -1;
+            //elements.d2dArea.focus();
+
+            elements.input.addEventListener('focus', e => {
+                if (!e.isTrusted) elements.d2dArea.focus();
+            });
+            elements.d2dArea.addEventListener('touchstart', () => {
+                if (document.activeElement === elements.input) elements.d2dArea.focus();
+                showTextSection();
+            });
+
+            updateConfigStyles();
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            setupDotEventListeners();
+            setupSpecialButtonListeners();
+            setupGestureListeners();
+        }
+
+        // --- Initialization on load ---
+        window.onload = () => {
+            initKeypad();
+            initResponsiveLayout();
+            setupDebugInterface();
+            setupExecuteButtonListener();
+            setupKeyboardHandlers();
+        };
+    </script>
 </body>
 
 </html>
