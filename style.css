@@ -174,12 +174,6 @@ button:hover {
         width: 100%;
     }
     
-    /* メモリ・辞書も縦並びに */
-    .memory-container,
-    .dictionary-container {
-        flex-direction: column;
-    }
-    
     /* 入力エリアの最小高さを調整 */
     #code-input {
         min-height: 150px;
