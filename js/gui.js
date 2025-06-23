@@ -199,13 +199,16 @@ const GUI = {
     
     // スタック表示の更新
     updateStackDisplay(stack) {
-        const display = this.elements.stackDisplay;
-        display.innerHTML = '';
-        
-        if (stack.length === 0) {
-            display.textContent = '(empty)';
-            return;
-        }
+    const display = this.elements.stackDisplay;
+    display.innerHTML = '';
+    
+    if (stack.length === 0) {
+        const emptySpan = document.createElement('span');
+        emptySpan.textContent = '(empty)';
+        emptySpan.style.color = '#ccc';
+        display.appendChild(emptySpan);
+        return;
+    }
         
         // スタックを右詰めで表示（トップが右）
         const container = document.createElement('div');
@@ -240,13 +243,30 @@ const GUI = {
     
     // レジスタ表示の更新
     updateRegisterDisplay(value) {
-        const display = this.elements.registerDisplay;
-        if (value === null) {
-            display.textContent = '(empty)';
-        } else {
-            display.textContent = this.formatValue(value);
-        }
-    },
+    const display = this.elements.registerDisplay;
+    display.innerHTML = '';
+    
+    if (value === null) {
+        const emptySpan = document.createElement('span');
+        emptySpan.textContent = '(empty)';
+        emptySpan.style.color = '#ccc';
+        display.appendChild(emptySpan);
+    } else {
+        display.textContent = this.formatValue(value);
+    }
+},
+
+// init関数の修正（初期状態でemptyを表示）
+init() {
+    this.cacheElements();
+    this.setupEventListeners();
+    this.updateMobileView();
+    this.renderDictionary();
+    
+    // 初期状態でスタックとレジスタを空表示
+    this.updateStackDisplay([]);
+    this.updateRegisterDisplay(null);
+}
     
     // 値のフォーマット
     formatValue(item) {
