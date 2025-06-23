@@ -141,12 +141,14 @@ button:hover {
 /* メモリ・辞書コンテナ */
 .memory-container, .dictionary-container {
     display: flex;
+    flex-direction: column;  /* 横並びから縦並びに変更 */
     gap: 1rem;
 }
 
 .stack-area, .register-area,
 .builtin-words-area, .custom-words-area {
-    flex: 1;
+    flex: none;  /* flex: 1 から変更 */
+    width: 100%;  /* 幅を100%に */
 }
 
 /* モバイル対応 */
