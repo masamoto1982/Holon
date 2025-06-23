@@ -211,7 +211,7 @@ const GUI = {
         const container = document.createElement('div');
         container.style.display = 'flex';
         container.style.flexWrap = 'wrap-reverse';
-        container.style.justifyContent = 'flex-end';
+        container.style.justifyContent = 'flex-start';
         container.style.alignContent = 'flex-start';
         
         stack.forEach((item, index) => {
