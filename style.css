@@ -1,0 +1,203 @@
+/* リセットとベース設定 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+    min-height: 100vh;
+}
+
+/* コンテナ */
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+header {
+    background-color: #fff;
+    padding: 1rem 2rem;
+    border-bottom: 1px solid #ddd;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+header h1 {
+    font-size: 1.5rem;
+}
+
+.version {
+    font-size: 0.875rem;
+    color: #666;
+}
+
+/* メインレイアウト - デスクトップで横並び */
+.main-layout {
+    display: flex;
+    flex: 1;
+    gap: 1rem;
+    padding: 1rem;
+    overflow: hidden;
+}
+
+/* パネル共通 */
+.panel {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 1rem;
+    overflow-y: auto;
+}
+
+/* 作業領域パネル */
+#workspace-panel {
+    flex: 3;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* 状態表示パネル */
+#state-panel {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+/* 各セクション */
+section {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 1rem;
+}
+
+section h2 {
+    font-size: 1.125rem;
+    margin-bottom: 0.5rem;
+    color: #555;
+}
+
+section h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+    color: #666;
+}
+
+/* 入力・出力エリア */
+.input-area, .output-area {
+    flex: 1;
+}
+
+#code-input {
+    width: 100%;
+    min-height: 200px;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    resize: vertical;
+}
+
+.controls {
+    margin-top: 0.5rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+button {
+    padding: 0.5rem 1rem;
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+button:hover {
+    background-color: #0056b3;
+}
+
+/* 表示エリア */
+.display-area, .state-display, .words-display {
+    background-color: #f8f8f8;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 0.5rem;
+    min-height: 100px;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
+/* メモリ・辞書コンテナ */
+.memory-container, .dictionary-container {
+    display: flex;
+    gap: 1rem;
+}
+
+.stack-area, .register-area,
+.builtin-words-area, .custom-words-area {
+    flex: 1;
+}
+
+/* モバイル対応 */
+@media (max-width: 768px) {
+    header {
+        padding: 0.75rem 1rem;
+    }
+    
+    header h1 {
+        font-size: 1.25rem;
+    }
+    
+    /* モバイルでは縦並び */
+    .main-layout {
+        flex-direction: column;
+        padding: 0.5rem;
+    }
+    
+    /* パネルの幅を100%に */
+    #workspace-panel,
+    #state-panel {
+        flex: none;
+        width: 100%;
+    }
+    
+    /* メモリ・辞書も縦並びに */
+    .memory-container,
+    .dictionary-container {
+        flex-direction: column;
+    }
+    
+    /* 入力エリアの最小高さを調整 */
+    #code-input {
+        min-height: 150px;
+    }
+    
+    /* ボタンサイズ調整 */
+    button {
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+    }
+}
+
+/* タブレット対応 */
+@media (min-width: 769px) and (max-width: 1024px) {
+    .main-layout {
+        gap: 0.75rem;
+        padding: 0.75rem;
+    }
+    
+    .panel {
+        padding: 0.75rem;
+    }
+}
