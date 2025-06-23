@@ -182,6 +182,10 @@ button:hover {
     font-size: 0.875rem;
 }
 
+.stack-display > div {
+    justify-content: flex-start !important; /* flex-endからflex-startに変更 */
+}
+
 /* モバイル対応 */
 @media (max-width: 768px) {
     /* bodyとhtmlのスクロール設定 */
@@ -252,10 +256,17 @@ button:hover {
     }
 }
 
-.memory-area {
+ .memory-area {
         cursor: pointer;
-        position: relative;
     }
+    
+    /* ::after疑似要素を削除 */
+}
+
+/* emptyテキストの色を薄く */
+.state-display {
+    color: #ccc; /* 薄い灰色 */
+}
     
     .memory-area::after {
         content: 'Tap to return to input mode';
