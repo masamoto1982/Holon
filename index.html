@@ -63,6 +63,18 @@
             </div>
         </main>
     </div>
+
+    <script type="module">
+    import { initWasm } from './js/wasm-loader.js';
+    
+    window.addEventListener('DOMContentLoaded', async () => {
+        const wasm = await initWasm();
+        if (wasm) {
+            window.HolonWasm = wasm;
+        }
+        // 既存の初期化コード
+    });
+</script>
     
     <!-- JavaScript files -->
     <!-- まだ作成していないファイルはコメントアウト -->
