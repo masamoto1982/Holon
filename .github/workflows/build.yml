@@ -30,7 +30,7 @@ jobs:
         wasm-pack build --target web --out-dir ../js/pkg
     
     - name: Upload artifacts
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v3
       with:
         name: wasm-build
         path: js/pkg/
@@ -47,7 +47,7 @@ jobs:
     - uses: actions/checkout@v4
     
     - name: Download WASM artifacts
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v3
       with:
         name: wasm-build
         path: js/pkg/
