@@ -6,6 +6,11 @@ on:
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -29,3 +34,32 @@ jobs:
       with:
         name: wasm-build
         path: js/pkg/
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Download WASM artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: wasm-build
+        path: js/pkg/
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+    
+    - name: Upload to Pages
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: '.'
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
