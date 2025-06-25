@@ -147,6 +147,7 @@ impl Interpreter {
             "TAIL" => self.op_tail()?,
             "CONS" => self.op_cons()?,
             "REVERSE" => self.op_reverse()?,
+            "NTH" => self.op_nth()?,
             "WORDS" => self.op_words()?,
             "WORDS?" => self.op_words_filter()?,
             _ => return Err(format!("Unknown builtin: {}", name)),
