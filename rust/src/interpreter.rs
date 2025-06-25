@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 use crate::types::*;
 use crate::tokenizer::*;
 use crate::builtins;
@@ -65,7 +64,7 @@ impl Interpreter {
                 },
                 Token::VectorStart => {
                     let (vector_tokens, consumed) = self.collect_vector(&tokens[i..])?;
-                    let mut saved_stack = self.stack.clone();
+                    let saved_stack = self.stack.clone();  // mutを削除
                     self.stack.clear();
                     
                     self.execute_tokens(&vector_tokens)?;
