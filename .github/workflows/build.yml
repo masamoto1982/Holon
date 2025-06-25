@@ -1,4 +1,4 @@
-name: Build and Deploy Holon
+name: Build and Deploy Ajisai
 
 on:
   push:
@@ -52,9 +52,17 @@ jobs:
         cd rust
         wasm-pack build --target web --out-dir ../js/pkg
     
+    - name: List generated files
+      run: |
+        echo "Contents of js/pkg:"
+        ls -la js/pkg/
+    
     - name: Deploy to GitHub Pages
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./
+        # 重要: _で始まるファイルも含める
+        force_orphan: false
+        keep_files: false
