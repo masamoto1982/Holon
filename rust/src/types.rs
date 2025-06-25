@@ -84,6 +84,14 @@ impl Fraction {
     pub fn eq(&self, other: &Fraction) -> bool {
         self.numerator * other.denominator == other.numerator * self.denominator
     }
+    
+    pub fn lt(&self, other: &Fraction) -> bool {
+        self.numerator * other.denominator < other.numerator * self.denominator
+    }
+    
+    pub fn le(&self, other: &Fraction) -> bool {
+        self.numerator * other.denominator <= other.numerator * self.denominator
+    }
 }
 
 impl fmt::Display for Value {
