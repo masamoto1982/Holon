@@ -553,4 +553,93 @@ impl Interpreter {
                     }
                 }
                 
-                self.dictionary.insert(name
+                self.dictionary.insert(name.clone(), WordDefinition {
+                    tokens,
+                    is_builtin: false,
+                });
+                Ok(())
+            },
+            _ => Err("Type error: DEF requires a vector and a string".to_string()),
+        }
+    }
+    
+    fn op_if(&mut self) -> Result<(), String> {
+        if self.stack.len() < 3 {
+            return Err("Stack underflow for IF".to_string());
+        }
+        
+        let else_branch = self.stack.pop().unwrap();
+        let then_branch = self.stack.pop().unwrap();
+        let condition = self.stack.pop().unwrap();
+        
+        match (&condition.val_type, &then_branch.val_type, &else_branch.val_type) {
+            (ValueType::Boolean(cond), ValueType::Vector(then_tokens), ValueType::Vector(else_tokens)) => {
+                let tokens_to_execute = if *cond { then_tokens } else { else_tokens };
+                
+                // ベクトルの内容を実行
+                for val in tokens_to_execute {
+                    self.stack.push(val.clone());
+                }
+                Ok(())
+            },
+            _ => Err("Type error: IF requires a boolean and two vectors".to_string()),
+        }
+    }
+    
+    // 辞書操作
+    fn op_words(&mut self) -> Result<(), String> {
+        let mut words: Vec<String> = self.dictionary.keys().cloned().collect();
+        words.sort();
+        
+        for word in words {
+            self.stack.push(Value {
+                val_type: ValueType::String(word),
+            });
+        }
+        Ok(())
+    }
+    
+    fn op_words_filter(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            match val.val_type {
+                ValueType::String(prefix) => {
+                    let mut words: Vec<String> = self.dictionary
+                        .keys()
+                        .filter(|k| k.starts_with(&prefix))
+                        .cloned()
+                        .collect();
+                    words.sort();
+                    
+                    for word in words {
+                        self.stack.push(Value {
+                            val_type: ValueType::String(word),
+                        });
+                    }
+                    Ok(())
+                },
+                _ => Err("Type error: WORDS? requires a string".to_string()),
+            }
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    // Public methods for WASM interface
+    pub fn get_stack(&self) -> &Stack {
+        &self.stack
+    }
+    
+    pub fn get_register(&self) -> &Register {
+        &self.register
+    }
+    
+    pub fn get_custom_words(&self) -> Vec<String> {
+        let mut words: Vec<String> = self.dictionary
+            .iter()
+            .filter(|(_, def)| !def.is_builtin)
+            .map(|(name, _)| name.clone())
+            .collect();
+        words.sort();
+        words
+    }
+}
