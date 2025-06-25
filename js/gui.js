@@ -50,28 +50,36 @@ const GUI = {
     
     // イベントリスナーの設定
     setupEventListeners() {
-        // Runボタン
-        document.getElementById('run-btn').addEventListener('click', () => {
+    // Runボタン
+    document.getElementById('run-btn').addEventListener('click', () => {
+        this.executeCode();
+    });
+    
+    // Clearボタン
+    document.getElementById('clear-btn').addEventListener('click', () => {
+        this.elements.codeInput.value = '';
+    });
+    
+    // Shift+Enterでの実行
+    this.elements.codeInput.addEventListener('keydown', (event) => {
+        if (event.shiftKey && event.key === 'Enter') {
+            event.preventDefault(); // デフォルトの改行を防ぐ
             this.executeCode();
-        });
-        
-        // Clearボタン
-        document.getElementById('clear-btn').addEventListener('click', () => {
-            this.elements.codeInput.value = '';
-        });
-        
-        // Memoryエリアのタッチで入力モードに戻る（モバイルのみ）
-        this.elements.memoryArea.addEventListener('click', () => {
-            if (this.isMobile() && this.mode === 'execution') {
-                this.setMode('input');
-            }
-        });
-        
-        // ウィンドウリサイズ時の処理
-        window.addEventListener('resize', () => {
-            this.updateMobileView();
-        });
-    },
+        }
+    });
+    
+    // Memoryエリアのタッチで入力モードに戻る（モバイルのみ）
+    this.elements.memoryArea.addEventListener('click', () => {
+        if (this.isMobile() && this.mode === 'execution') {
+            this.setMode('input');
+        }
+    });
+    
+    // ウィンドウリサイズ時の処理
+    window.addEventListener('resize', () => {
+        this.updateMobileView();
+    });
+},
     
     // モバイル判定
     isMobile() {
@@ -113,14 +121,19 @@ const GUI = {
     
     // 辞書の描画
     renderDictionary() {
-        // 組み込みワード（ダミー）
-        const builtinWords = ['+', '-', '*', '/', 'DUP', 'DROP', 'SWAP', '>R', 'R>', 'R@'];
-        this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords);
-        
-        // カスタムワード（ダミー）
-        const customWords = ['SQUARE', 'DOUBLE'];
-        this.renderWordButtons(this.elements.customWordsDisplay, customWords);
-    },
+    // 組み込みワード
+    const builtinWords = [
+        '+', '-', '*', '/', '=', '>', '>=', '<', '<=',
+        'DUP', 'DROP', 'SWAP', 'OVER', 'ROT',
+        '>R', 'R>', 'R@',
+        'LENGTH', 'HEAD', 'TAIL', 'CONS', 'REVERSE', 'NTH',
+        'DEF', 'IF', 'WORDS', 'WORDS?'
+    ];
+    this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords);
+    
+    // カスタムワードは初期状態では空
+    this.renderWordButtons(this.elements.customWordsDisplay, []);
+},
     
     // ワードボタンの描画
     renderWordButtons(container, words) {
@@ -156,6 +169,7 @@ const GUI = {
     },
     
     // executeCode関数を以下に置き換え
+// executeCode関数を修正
 async executeCode() {
     const code = this.elements.codeInput.value.trim();
     if (!code) return;
@@ -191,6 +205,9 @@ async executeCode() {
             const customWords = window.ajisaiInterpreter.get_custom_words();
             this.renderWordButtons(this.elements.customWordsDisplay, customWords);
             
+            // 成功時はテキストエディタをクリア
+            this.elements.codeInput.value = '';
+            
             // モバイルでは実行モードに切り替え
             if (this.isMobile()) {
                 this.setMode('execution');
@@ -198,9 +215,11 @@ async executeCode() {
         } else {
             // エラー時
             this.elements.outputDisplay.textContent = result;
+            // エラー時はテキストエディタの内容を保持
         }
     } catch (error) {
         this.elements.outputDisplay.textContent = `Error: ${error.message || error}`;
+        // エラー時はテキストエディタの内容を保持
     }
 },
 
