@@ -29,72 +29,28 @@ jobs:
       run: |
         curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
     
-    - name: Cache cargo registry
-      uses: actions/cache@v3
-      with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Cache cargo index
-      uses: actions/cache@v3
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Cache cargo build
-      uses: actions/cache@v3
-      with:
-        path: rust/target
-        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
-    
     - name: Build WASM
       run: |
         cd rust
         wasm-pack build --target web --out-dir ../js/pkg
     
-    - name: Debug - Check generated files
+    - name: List generated files
       run: |
-        echo "=== Current directory structure ==="
-        find . -type f -name "*.wasm" -o -name "*.js" | grep -E "(pkg|wasm)" | sort
+        echo "=== js/pkg contents ==="
+        ls -la js/pkg/ || echo "pkg directory not found"
         echo ""
-        echo "=== Contents of js/pkg (if exists) ==="
-        if [ -d "js/pkg" ]; then
-          ls -la js/pkg/
-        else
-          echo "ERROR: js/pkg directory not found!"
-        fi
+        echo "=== All .wasm files ==="
+        find . -name "*.wasm" -type f
     
     - name: Create .nojekyll
       run: touch .nojekyll
     
-    - name: Prepare deployment directory
-      run: |
-        # 一時的なデプロイディレクトリを作成
-        mkdir -p deploy_dir
-        
-        # 必要なファイルをコピー
-        cp -r index.html style.css js deploy_dir/
-        
-        # .nojekyllもコピー
-        cp .nojekyll deploy_dir/
-        
-        # デプロイディレクトリの内容を確認
-        echo "=== Deploy directory structure ==="
-        find deploy_dir -type f | sort
-        
-        # pkgフォルダの確認
-        echo ""
-        echo "=== Checking pkg in deploy directory ==="
-        if [ -d "deploy_dir/js/pkg" ]; then
-          ls -la deploy_dir/js/pkg/
-        else
-          echo "ERROR: pkg not in deploy directory!"
-        fi
-    
-    - name: Deploy to GitHub Pages
+    - name: Commit and push generated files
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./deploy_dir
-        force_orphan: true
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add -f js/pkg
+        git add .nojekyll
+        git diff --staged --quiet || git commit -m "Add WASM build artifacts"
+        git push origin main || echo "No changes to push"
