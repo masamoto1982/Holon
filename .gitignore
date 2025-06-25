@@ -3,7 +3,7 @@ rust/target/
 rust/Cargo.lock
 
 # ビルド生成物は含めない（GitHub Actionsでビルドするため）
-js/pkg/
+# js/pkg/  ← この行をコメントアウトまたは削除
 
 # OS関連
 .DS_Store
