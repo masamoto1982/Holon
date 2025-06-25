@@ -21,6 +21,9 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        persist-credentials: true
     
     - name: Setup Rust
       uses: dtolnay/rust-toolchain@stable
@@ -34,45 +37,38 @@ jobs:
         cd rust
         wasm-pack build --target web --out-dir ../js/pkg
         
-        # wasm-packが生成する.gitignoreを削除
-        rm -f ../js/pkg/.gitignore
-        
         # 生成されたファイルを確認
         echo "=== Generated files in js/pkg ==="
         ls -la ../js/pkg/
-        
-        # JSファイルの内容を確認（最初の数行）
-        echo ""
-        echo "=== First lines of generated JS files ==="
-        head -n 5 ../js/pkg/*.js || true
-    
-    - name: List generated files
-      run: |
-        echo "=== js/pkg contents ==="
-        ls -la js/pkg/ || echo "pkg directory not found"
-        echo ""
-        echo "=== All .wasm files ==="
-        find . -name "*.wasm" -type f
     
     - name: Create .nojekyll
       run: touch .nojekyll
     
-    - name: Commit and push generated files
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    - name: Configure Git
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config --global user.email "action@github.com"
+        git config --global user.name "GitHub Action"
+    
+    - name: Check and commit files
+      run: |
+        # 現在の状態を確認
+        echo "=== Git status before ==="
+        git status
         
-        # .gitignoreを一時的に無効化
-        echo "# Temporarily allow pkg files" >> .gitignore
-        echo "!js/pkg/" >> .gitignore
-        echo "!js/pkg/**" >> .gitignore
-        
-        # 強制的に追加
+        # pkgフォルダを強制的に追加
         git add -f js/pkg/
         git add .nojekyll
-        git add .gitignore
         
-        # コミットとプッシュ
-        git diff --staged --quiet || git commit -m "Add WASM build artifacts"
-        git push origin main || echo "No changes to push"
+        # 変更があるか確認
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+        else
+          echo "=== Files to be committed ==="
+          git diff --staged --name-only
+          
+          # コミット
+          git commit -m "Add WASM build artifacts [skip ci]"
+          
+          # プッシュ
+          git push origin main
+        fi
