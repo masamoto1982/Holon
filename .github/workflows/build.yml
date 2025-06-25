@@ -30,9 +30,21 @@ jobs:
         curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
     
     - name: Build WASM
-  run: |
-    cd rust
-    wasm-pack build --target web --out-dir ../js/pkg
+      run: |
+        cd rust
+        wasm-pack build --target web --out-dir ../js/pkg
+        
+        # wasm-packが生成する.gitignoreを削除
+        rm -f ../js/pkg/.gitignore
+        
+        # 生成されたファイルを確認
+        echo "=== Generated files in js/pkg ==="
+        ls -la ../js/pkg/
+        
+        # JSファイルの内容を確認（最初の数行）
+        echo ""
+        echo "=== First lines of generated JS files ==="
+        head -n 5 ../js/pkg/*.js || true
     
     - name: List generated files
       run: |
