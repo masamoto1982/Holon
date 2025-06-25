@@ -1,6 +1,4 @@
 use wasm_bindgen::prelude::*;
-use std::collections::HashMap;
-use std::rc::Rc;
 
 mod types;
 mod tokenizer;
@@ -8,7 +6,6 @@ mod interpreter;
 mod builtins;
 
 use types::*;
-use tokenizer::*;
 use interpreter::*;
 
 #[wasm_bindgen]
@@ -34,13 +31,18 @@ impl AjisaiInterpreter {
     }
 
     #[wasm_bindgen]
-    pub fn get_stack(&self) -> Result<JsValue, JsValue> {
+    pub fn get_stack(&self) -> JsValue {
         let stack_values: Vec<JsValue> = self.interpreter
             .get_stack()
             .iter()
             .map(|v| value_to_js(v))
             .collect();
-        Ok(JsValue::from_serde(&stack_values).unwrap())
+        
+        let arr = js_sys::Array::new();
+        for val in stack_values {
+            arr.push(&val);
+        }
+        arr.into()
     }
 
     #[wasm_bindgen]
