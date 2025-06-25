@@ -518,6 +518,40 @@ impl Interpreter {
             Err("Stack underflow".to_string())
         }
     }
+
+    // ベクトルのインデックスアクセス（負のインデックスサポート）
+    fn op_nth(&mut self) -> Result<(), String> {
+        if self.stack.len() < 2 {
+            return Err("Stack underflow".to_string());
+        }
+        
+        let vec_val = self.stack.pop().unwrap();
+        let index_val = self.stack.pop().unwrap();
+        
+        match (&index_val.val_type, &vec_val.val_type) {
+            (ValueType::Number(n), ValueType::Vector(v)) => {
+                if n.denominator != 1 {
+                    return Err("NTH requires an integer index".to_string());
+                }
+                
+                let mut index = n.numerator;
+                let len = v.len() as i64;
+                
+                // 負のインデックスの処理
+                if index < 0 {
+                    index = len + index;
+                }
+                
+                if index < 0 || index >= len {
+                    return Err(format!("Index {} out of bounds for vector of length {}", n.numerator, len));
+                }
+                
+                self.stack.push(v[index as usize].clone());
+                Ok(())
+            },
+            _ => Err("Type error: NTH requires a number and a vector".to_string()),
+        }
+    }
     
     // 制御構造
     fn op_def(&mut self) -> Result<(), String> {
