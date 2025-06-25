@@ -1,2 +1,1 @@
 # Ajisai
-test
