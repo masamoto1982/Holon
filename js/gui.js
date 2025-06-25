@@ -155,51 +155,101 @@ const GUI = {
         input.focus();
     },
     
-    // コード実行（ダミー実装）
-    executeCode() {
-        const code = this.elements.codeInput.value.trim();
-        if (!code) return;
+    // executeCode関数を以下に置き換え
+async executeCode() {
+    const code = this.elements.codeInput.value.trim();
+    if (!code) return;
+    
+    // WASMインタープリタが利用可能か確認
+    if (!window.HolonWasm || !window.ajisaiInterpreter) {
+        // WASMが利用できない場合は初期化を試みる
+        if (window.HolonWasm) {
+            window.ajisaiInterpreter = new window.HolonWasm.AjisaiInterpreter();
+        } else {
+            this.elements.outputDisplay.textContent = 'Error: WASM not loaded';
+            return;
+        }
+    }
+    
+    try {
+        // コードを実行
+        const result = window.ajisaiInterpreter.execute(code);
         
-        // 簡単なダミー実行
-        const tokens = code.split(/\s+/);
-        const stack = [];
-        
-        try {
-            tokens.forEach(token => {
-                if (!isNaN(token)) {
-                    // 数値
-                    stack.push(createValue(parseFloat(token), Types.NUMBER));
-                } else if (token === '+') {
-                    // 加算
-                    if (stack.length < 2) throw new Error('Stack underflow');
-                    const b = stack.pop();
-                    const a = stack.pop();
-                    stack.push(createValue(a.value + b.value, Types.NUMBER));
-                } else if (token === 'DUP') {
-                    // 複製
-                    if (stack.length < 1) throw new Error('Stack underflow');
-                    const top = stack[stack.length - 1];
-                    stack.push({...top});
-                } else {
-                    // その他（シンボルとして扱う）
-                    stack.push(createValue(token, Types.SYMBOL));
-                }
-            });
-            
-            // 結果を表示
+        if (result === 'OK') {
+            // 成功時
             this.elements.outputDisplay.textContent = 'OK';
-            this.updateStackDisplay(stack);
-            this.updateRegisterDisplay(null);
+            
+            // スタックを取得して表示
+            const stack = window.ajisaiInterpreter.get_stack();
+            this.updateStackDisplay(this.convertWasmStack(stack));
+            
+            // レジスタを取得して表示
+            const register = window.ajisaiInterpreter.get_register();
+            this.updateRegisterDisplay(this.convertWasmValue(register));
+            
+            // カスタムワードを更新
+            const customWords = window.ajisaiInterpreter.get_custom_words();
+            this.renderWordButtons(this.elements.customWordsDisplay, customWords);
             
             // モバイルでは実行モードに切り替え
             if (this.isMobile()) {
                 this.setMode('execution');
             }
-            
-        } catch (error) {
-            this.elements.outputDisplay.textContent = `Error: ${error.message}`;
+        } else {
+            // エラー時
+            this.elements.outputDisplay.textContent = result;
         }
-    },
+    } catch (error) {
+        this.elements.outputDisplay.textContent = `Error: ${error.message || error}`;
+    }
+},
+
+// WASMの値をJSの形式に変換
+convertWasmValue(wasmValue) {
+    if (!wasmValue || wasmValue === null) return null;
+    
+    if (wasmValue.type === 'vector' && Array.isArray(wasmValue.value)) {
+        return {
+            type: Types.VECTOR,
+            value: wasmValue.value.map(v => this.convertWasmValue(v))
+        };
+    }
+    
+    const typeMap = {
+        'number': Types.NUMBER,
+        'string': Types.STRING,
+        'boolean': Types.BOOLEAN,
+        'symbol': Types.SYMBOL,
+        'nil': Types.NIL
+    };
+    
+    return {
+        type: typeMap[wasmValue.type] || wasmValue.type,
+        value: wasmValue.value
+    };
+},
+
+// WASMのスタックをJSの形式に変換
+convertWasmStack(wasmStack) {
+    if (!Array.isArray(wasmStack)) return [];
+    return wasmStack.map(v => this.convertWasmValue(v));
+},
+
+// renderDictionary関数を修正
+renderDictionary() {
+    // 組み込みワード
+    const builtinWords = [
+        '+', '-', '*', '/', '=', '>', '>=', '<', '<=',
+        'DUP', 'DROP', 'SWAP', 'OVER', 'ROT',
+        '>R', 'R>', 'R@',
+        'LENGTH', 'HEAD', 'TAIL', 'CONS', 'REVERSE',
+        'DEF', 'IF', 'WORDS', 'WORDS?'
+    ];
+    this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords);
+    
+    // カスタムワードは初期状態では空
+    this.renderWordButtons(this.elements.customWordsDisplay, []);
+},
     
     // スタック表示の更新
     updateStackDisplay(stack) {
