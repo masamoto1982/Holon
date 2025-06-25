@@ -20,6 +20,7 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     register_builtin(dictionary, "TAIL");
     register_builtin(dictionary, "CONS");
     register_builtin(dictionary, "REVERSE");
+    register_builtin(dictionary, "NTH");
     
     // 制御構造
     register_builtin(dictionary, "DEF");
