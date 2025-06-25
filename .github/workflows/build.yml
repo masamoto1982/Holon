@@ -50,12 +50,24 @@ jobs:
     - name: Build WASM
       run: |
         cd rust
-        wasm-pack build --target web --out-dir ../js/pkg
+        echo "Current directory: $(pwd)"
+        echo "Cargo.toml contents:"
+        cat Cargo.toml
+        echo "Building WASM..."
+        wasm-pack build --target web --out-dir ../js/pkg --dev
+        echo "Build completed"
     
-    - name: List generated files
+    - name: Debug - List all files
       run: |
-        echo "Contents of js/pkg:"
-        ls -la js/pkg/
+        echo "Root directory:"
+        ls -la
+        echo "js directory:"
+        ls -la js/
+        echo "js/pkg directory (if exists):"
+        ls -la js/pkg/ || echo "pkg directory not found"
+    
+    - name: Create .nojekyll
+      run: touch .nojekyll
     
     - name: Deploy to GitHub Pages
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -63,6 +75,5 @@ jobs:
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: ./
-        # 重要: _で始まるファイルも含める
         force_orphan: false
         keep_files: false
