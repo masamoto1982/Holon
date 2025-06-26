@@ -329,18 +329,33 @@ renderDictionary() {
         }
     },
     
-    // 値のフォーマット
-    formatValue(item) {
-        if (item.type === Types.NUMBER) {
-            return item.value.toString();
-        } else if (item.type === Types.STRING) {
-            return `"${item.value}"`;
-        } else if (item.type === Types.SYMBOL) {
-            return item.value;
-        } else if (item.type === Types.NIL) {
-            return 'nil';
+    // formatValue関数を修正
+formatValue(item) {
+    if (!item) return 'undefined';
+    
+    if (item.type === Types.NUMBER) {
+        // 数値または分数文字列として表示
+        if (typeof item.value === 'string') {
+            return item.value; // 分数または大きな整数
         } else {
-            return JSON.stringify(item.value);
+            return item.value.toString();
         }
+    } else if (item.type === Types.STRING) {
+        return `"${item.value}"`;
+    } else if (item.type === Types.SYMBOL) {
+        return item.value;
+    } else if (item.type === Types.BOOLEAN) {
+        return item.value ? 'true' : 'false';
+    } else if (item.type === Types.VECTOR) {
+        if (Array.isArray(item.value)) {
+            const elements = item.value.map(v => this.formatValue(v)).join(' ');
+            return `[ ${elements} ]`;
+        } else {
+            return '[ ]';
+        }
+    } else if (item.type === Types.NIL) {
+        return 'nil';
+    } else {
+        return JSON.stringify(item.value);
     }
-};
+}
