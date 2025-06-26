@@ -81,14 +81,21 @@ fn value_to_js(value: &Value) -> JsValue {
     let val = match &value.val_type {
         ValueType::Number(n) => {
             if n.denominator == 1 {
-                n.numerator.into()
+                // i64をf64に変換してからJsValueに変換
+                // JavaScriptの数値として安全に扱える範囲内であることを確認
+                if n.numerator >= -(1i64 << 53) && n.numerator <= (1i64 << 53) {
+                    JsValue::from_f64(n.numerator as f64)
+                } else {
+                    // 大きすぎる数値は文字列として返す
+                    JsValue::from_str(&n.numerator.to_string())
+                }
             } else {
-                format!("{}/{}", n.numerator, n.denominator).into()
+                JsValue::from_str(&format!("{}/{}", n.numerator, n.denominator))
             }
         },
-        ValueType::String(s) => s.clone().into(),
-        ValueType::Boolean(b) => (*b).into(),
-        ValueType::Symbol(s) => s.clone().into(),
+        ValueType::String(s) => JsValue::from_str(s),
+        ValueType::Boolean(b) => JsValue::from_bool(*b),
+        ValueType::Symbol(s) => JsValue::from_str(s),
         ValueType::Vector(v) => {
             let arr = js_sys::Array::new();
             for item in v.iter() {
