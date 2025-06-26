@@ -358,4 +358,4 @@ formatValue(item) {
     } else {
         return JSON.stringify(item.value);
     }
-}
+},
