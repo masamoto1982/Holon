@@ -30,11 +30,15 @@ impl Interpreter {
     
     pub fn execute(&mut self, code: &str) -> Result<(), String> {
         let tokens = tokenize(code)?;
-        self.execute_tokens(&tokens)?;
+        self.execute_tokens_with_context(&tokens, false)?;
         Ok(())
     }
     
     pub fn execute_tokens(&mut self, tokens: &[Token]) -> Result<(), String> {
+        self.execute_tokens_with_context(tokens, false)
+    }
+    
+    fn execute_tokens_with_context(&mut self, tokens: &[Token], in_vector: bool) -> Result<(), String> {
         let mut i = 0;
         
         while i < tokens.len() {
@@ -64,10 +68,11 @@ impl Interpreter {
                 },
                 Token::VectorStart => {
                     let (vector_tokens, consumed) = self.collect_vector(&tokens[i..])?;
-                    let saved_stack = self.stack.clone();  // mutを削除
+                    let saved_stack = self.stack.clone();
                     self.stack.clear();
                     
-                    self.execute_tokens(&vector_tokens)?;
+                    // ベクトル内のトークンを実行（ベクトルコンテキストで）
+                    self.execute_tokens_with_context(&vector_tokens, true)?;
                     
                     let vector_contents = self.stack.clone();
                     self.stack = saved_stack;
@@ -79,18 +84,34 @@ impl Interpreter {
                     i += consumed - 1;
                 },
                 Token::Symbol(name) => {
-                    if let Some(def) = self.dictionary.get(name) {
-                        if def.is_builtin {
-                            self.execute_builtin(name)?;
-                        } else {
-                            self.execute_tokens(&def.tokens.clone())?;
-                        }
+                    if in_vector {
+                        // ベクトル内ではシンボルとしてスタックに積む
+                        self.stack.push(Value {
+                            val_type: ValueType::Symbol(name.clone()),
+                        });
                     } else {
-                        return Err(format!("Unknown word: {}", name));
+                        // 通常のコンテキストでは実行
+                        if let Some(def) = self.dictionary.get(name) {
+                            if def.is_builtin {
+                                self.execute_builtin(name)?;
+                            } else {
+                                self.execute_tokens(&def.tokens.clone())?;
+                            }
+                        } else {
+                            return Err(format!("Unknown word: {}", name));
+                        }
                     }
                 },
                 Token::Operator(op) => {
-                    self.execute_operator(op)?;
+                    if in_vector {
+                        // ベクトル内ではシンボルとしてスタックに積む
+                        self.stack.push(Value {
+                            val_type: ValueType::Symbol(op.clone()),
+                        });
+                    } else {
+                        // 通常のコンテキストでは実行
+                        self.execute_operator(op)?;
+                    }
                 },
                 _ => {
                     return Err(format!("Unexpected token: {:?}", tokens[i]));
