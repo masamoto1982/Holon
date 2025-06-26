@@ -168,9 +168,7 @@ const GUI = {
         input.focus();
     },
     
-    // executeCode関数を以下に置き換え
-// executeCode関数を修正
-async executeCode() {
+         async executeCode() {
     const code = this.elements.codeInput.value.trim();
     if (!code) return;
     
@@ -363,3 +361,5 @@ formatValue(item) {
         return JSON.stringify(item.value);
     }
 }
+
+    };
