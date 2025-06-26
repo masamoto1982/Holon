@@ -329,7 +329,7 @@ renderDictionary() {
         }
     },
     
-    // formatValue関数を修正
+    // 値のフォーマット
 formatValue(item) {
     if (!item) return 'undefined';
     
@@ -348,7 +348,11 @@ formatValue(item) {
         return item.value ? 'true' : 'false';
     } else if (item.type === Types.VECTOR) {
         if (Array.isArray(item.value)) {
-            const elements = item.value.map(v => this.formatValue(v)).join(' ');
+            // thisを正しくバインドするため、通常の関数を使用
+            const self = this;
+            const elements = item.value.map(function(v) {
+                return self.formatValue(v);
+            }).join(' ');
             return `[ ${elements} ]`;
         } else {
             return '[ ]';
@@ -358,4 +362,4 @@ formatValue(item) {
     } else {
         return JSON.stringify(item.value);
     }
-},
+}
