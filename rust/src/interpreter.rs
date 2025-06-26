@@ -157,14 +157,15 @@ impl Interpreter {
     
     // op_def関数も修正してデバッグログを追加
     fn op_def(&mut self) -> Result<(), String> {
-        console_log!("DEF: stack before = {:?}", self.stack);
-        
         if self.stack.len() < 2 {
-            return Err("Stack underflow for DEF".to_string());
+            return Err(format!("Stack underflow for DEF. Stack has {} items", self.stack.len()));
         }
         
         let name_val = self.stack.pop().unwrap();
         let body_val = self.stack.pop().unwrap();
+        
+        // デバッグ情報をエラーとして返す（一時的）
+        return Err(format!("DEBUG - DEF: name={:?}, body={:?}", name_val, body_val));
         
         console_log!("DEF: name_val = {:?}", name_val);
         console_log!("DEF: body_val = {:?}", body_val);
