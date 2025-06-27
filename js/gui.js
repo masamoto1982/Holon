@@ -136,20 +136,39 @@ const GUI = {
 },
     
     // ワードボタンの描画
-    renderWordButtons(container, words, isCustom = false) {
+renderWordButtons(container, words, isCustom = false) {
     container.innerHTML = '';
     words.forEach(wordInfo => {
         // wordInfoは文字列またはオブジェクト
         const word = typeof wordInfo === 'string' ? wordInfo : wordInfo.name;
         const description = typeof wordInfo === 'object' ? wordInfo.description : null;
+        const isProtected = typeof wordInfo === 'object' ? wordInfo.protected : false;
         
         const button = document.createElement('button');
         button.textContent = word;
         button.className = 'word-button';
         
+        // スタイルクラスを追加
+        if (!isCustom) {
+            // 組み込みワード
+            button.classList.add('builtin');
+        } else if (isProtected) {
+            // 依存されているカスタムワード
+            button.classList.add('protected');
+        } else {
+            // 通常のカスタムワード
+            button.classList.add('deletable');
+        }
+        
         // 説明がある場合はツールチップを設定
         if (description) {
             button.title = description;
+        } else if (!isCustom) {
+            button.title = "組み込みワード（削除・上書き不可）";
+        } else if (isProtected) {
+            button.title = "他のワードから使用されています（削除・上書き不可）";
+        } else {
+            button.title = "カスタムワード（削除・上書き可能）";
         }
         
         button.addEventListener('click', () => {
@@ -181,8 +200,8 @@ const GUI = {
     input.focus();
 },
     
-    // コード実行
-    async executeCode() {
+    // executeCode関数の修正（カスタムワード情報の取得部分）
+async executeCode() {
     const code = this.elements.codeInput.value.trim();
     if (!code) return;
     
@@ -213,14 +232,15 @@ const GUI = {
             const register = window.ajisaiInterpreter.get_register();
             this.updateRegisterDisplay(this.convertWasmValue(register));
             
-            // カスタムワードを更新（説明付き）
-            const customWords = window.ajisaiInterpreter.get_custom_words_with_descriptions();
-            const customWordInfos = customWords.map(wordData => {
-                // wordDataが配列の場合: [名前, 説明]
+            // カスタムワードを更新（説明と保護状態付き）
+            const customWordsInfo = window.ajisaiInterpreter.get_custom_words_info();
+            const customWordInfos = customWordsInfo.map(wordData => {
+                // wordDataが配列の場合: [名前, 説明, 保護状態]
                 if (Array.isArray(wordData)) {
                     return {
                         name: wordData[0],
-                        description: wordData[1] || null
+                        description: wordData[1] || null,
+                        protected: wordData[2] || false
                     };
                 } else {
                     // 後方互換性のため
