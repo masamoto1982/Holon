@@ -121,106 +121,131 @@ const GUI = {
     
     // 辞書の描画
     renderDictionary() {
-        // 組み込みワード
-        const builtinWords = [
-            '+', '-', '*', '/', '=', '>', '>=', '<', '<=',
-            'DUP', 'DROP', 'SWAP', 'OVER', 'ROT',
-            '>R', 'R>', 'R@',
-            'LENGTH', 'HEAD', 'TAIL', 'CONS', 'REVERSE', 'NTH',
-            'DEF', 'IF', 'WORDS', 'WORDS?'
-        ];
-        this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords);
-        
-        // カスタムワードは初期状態では空
-        this.renderWordButtons(this.elements.customWordsDisplay, []);
-    },
+    // 組み込みワード
+    const builtinWords = [
+        '+', '-', '*', '/', '=', '>', '>=', '<', '<=',
+        'DUP', 'DROP', 'SWAP', 'OVER', 'ROT',
+        '>R', 'R>', 'R@',
+        'LENGTH', 'HEAD', 'TAIL', 'CONS', 'REVERSE', 'NTH',
+        'DEF', 'IF', 'WORDS', 'WORDS?'
+    ];
+    this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords, false);
+    
+    // カスタムワードは初期状態では空
+    this.renderWordButtons(this.elements.customWordsDisplay, [], true);
+},
     
     // ワードボタンの描画
-    renderWordButtons(container, words) {
-        container.innerHTML = '';
-        words.forEach(word => {
-            const button = document.createElement('button');
-            button.textContent = word;
-            button.className = 'word-button';
-            button.addEventListener('click', () => {
-                this.insertWord(word);
-            });
-            container.appendChild(button);
+    renderWordButtons(container, words, isCustom = false) {
+    container.innerHTML = '';
+    words.forEach(wordInfo => {
+        // wordInfoは文字列またはオブジェクト
+        const word = typeof wordInfo === 'string' ? wordInfo : wordInfo.name;
+        const description = typeof wordInfo === 'object' ? wordInfo.description : null;
+        
+        const button = document.createElement('button');
+        button.textContent = word;
+        button.className = 'word-button';
+        
+        // 説明がある場合はツールチップを設定
+        if (description) {
+            button.title = description;
+        }
+        
+        button.addEventListener('click', () => {
+            this.insertWord(word, isCustom);
         });
-    },
+        container.appendChild(button);
+    });
+},
     
     // ワードの挿入
-    insertWord(word) {
-        const input = this.elements.codeInput;
-        const start = input.selectionStart;
-        const end = input.selectionEnd;
-        const text = input.value;
-        
-        // カーソル位置に挿入
-        input.value = text.substring(0, start) + word + text.substring(end);
-        
-        // カーソル位置を更新
-        const newPos = start + word.length;
-        input.selectionStart = newPos;
-        input.selectionEnd = newPos;
-        
-        // フォーカスを維持
-        input.focus();
-    },
+    insertWord(word, isCustom = false) {
+    const input = this.elements.codeInput;
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    const text = input.value;
+    
+    // カスタムワードの場合は symbol: プレフィックスを付ける
+    const insertText = isCustom ? `symbol:${word}` : word;
+    
+    // カーソル位置に挿入
+    input.value = text.substring(0, start) + insertText + text.substring(end);
+    
+    // カーソル位置を更新
+    const newPos = start + insertText.length;
+    input.selectionStart = newPos;
+    input.selectionEnd = newPos;
+    
+    // フォーカスを維持
+    input.focus();
+},
     
     // コード実行
     async executeCode() {
-        const code = this.elements.codeInput.value.trim();
-        if (!code) return;
-        
-        // WASMインタープリタが利用可能か確認
-        if (!window.HolonWasm || !window.ajisaiInterpreter) {
-            // WASMが利用できない場合は初期化を試みる
-            if (window.HolonWasm) {
-                window.ajisaiInterpreter = new window.HolonWasm.AjisaiInterpreter();
-            } else {
-                this.elements.outputDisplay.textContent = 'Error: WASM not loaded';
-                return;
-            }
+    const code = this.elements.codeInput.value.trim();
+    if (!code) return;
+    
+    // WASMインタープリタが利用可能か確認
+    if (!window.HolonWasm || !window.ajisaiInterpreter) {
+        // WASMが利用できない場合は初期化を試みる
+        if (window.HolonWasm) {
+            window.ajisaiInterpreter = new window.HolonWasm.AjisaiInterpreter();
+        } else {
+            this.elements.outputDisplay.textContent = 'Error: WASM not loaded';
+            return;
         }
+    }
+    
+    try {
+        // コードを実行
+        const result = window.ajisaiInterpreter.execute(code);
         
-        try {
-            // コードを実行
-            const result = window.ajisaiInterpreter.execute(code);
+        if (result === 'OK') {
+            // 成功時
+            this.elements.outputDisplay.textContent = 'OK';
             
-            if (result === 'OK') {
-                // 成功時
-                this.elements.outputDisplay.textContent = 'OK';
-                
-                // スタックを取得して表示
-                const stack = window.ajisaiInterpreter.get_stack();
-                this.updateStackDisplay(this.convertWasmStack(stack));
-                
-                // レジスタを取得して表示
-                const register = window.ajisaiInterpreter.get_register();
-                this.updateRegisterDisplay(this.convertWasmValue(register));
-                
-                // カスタムワードを更新
-                const customWords = window.ajisaiInterpreter.get_custom_words();
-                this.renderWordButtons(this.elements.customWordsDisplay, customWords);
-                
-                // 成功時はテキストエディタをクリア
-                this.elements.codeInput.value = '';
-                
-                // モバイルでは実行モードに切り替え
-                if (this.isMobile()) {
-                    this.setMode('execution');
+            // スタックを取得して表示
+            const stack = window.ajisaiInterpreter.get_stack();
+            this.updateStackDisplay(this.convertWasmStack(stack));
+            
+            // レジスタを取得して表示
+            const register = window.ajisaiInterpreter.get_register();
+            this.updateRegisterDisplay(this.convertWasmValue(register));
+            
+            // カスタムワードを更新（説明付き）
+            const customWords = window.ajisaiInterpreter.get_custom_words_with_descriptions();
+            const customWordInfos = customWords.map(wordData => {
+                // wordDataが配列の場合: [名前, 説明]
+                if (Array.isArray(wordData)) {
+                    return {
+                        name: wordData[0],
+                        description: wordData[1] || null
+                    };
+                } else {
+                    // 後方互換性のため
+                    return wordData;
                 }
-            } else {
-                // エラー時
-                this.elements.outputDisplay.textContent = result;
-                // エラー時はテキストエディタの内容を保持
+            });
+            this.renderWordButtons(this.elements.customWordsDisplay, customWordInfos, true);
+            
+            // 成功時はテキストエディタをクリア
+            this.elements.codeInput.value = '';
+            
+            // モバイルでは実行モードに切り替え
+            if (this.isMobile()) {
+                this.setMode('execution');
             }
-        } catch (error) {
-            this.elements.outputDisplay.textContent = `Error: ${error.message || error}`;
+        } else {
+            // エラー時
+            this.elements.outputDisplay.textContent = result;
             // エラー時はテキストエディタの内容を保持
         }
-    },
+    } catch (error) {
+        this.elements.outputDisplay.textContent = `Error: ${error.message || error}`;
+        // エラー時はテキストエディタの内容を保持
+    }
+},
     
     // WASMの値をJSの形式に変換
     convertWasmValue(wasmValue) {
