@@ -172,18 +172,50 @@ button:hover {
 }
 
 /* ワードボタン */
+/* ワードボタン */
 .word-button {
     margin: 2px;
     padding: 0.4rem 0.8rem;
     background-color: #f0f0f0;
     color: #333;
-    border: 1px solid #ccc;
+    border: 2px solid #ccc;  /* ボーダーを2pxに変更 */
     font-family: 'Consolas', 'Monaco', monospace;
     font-size: 0.875rem;
+    transition: all 0.2s ease;
 }
 
 .word-button:hover {
     background-color: #e0e0e0;
+}
+
+/* 組み込みワード（削除・上書き不可） */
+.word-button.builtin {
+    border-color: #dc3545;  /* 赤色の縁取り */
+    background-color: #fff5f5;
+}
+
+.word-button.builtin:hover {
+    background-color: #ffe0e0;
+}
+
+/* 依存されているカスタムワード（削除・上書き不可） */
+.word-button.protected {
+    border-color: #fd7e14;  /* オレンジ色の縁取り */
+    background-color: #fff8f0;
+}
+
+.word-button.protected:hover {
+    background-color: #ffead0;
+}
+
+/* 通常のカスタムワード（削除・上書き可能） */
+.word-button.deletable {
+    border-color: #28a745;  /* 緑色の縁取り */
+    background-color: #f0fff4;
+}
+
+.word-button.deletable:hover {
+    background-color: #e0ffe8;
 }
 
 /* スタック項目 */
