@@ -3,21 +3,6 @@ use crate::types::*;
 use crate::tokenizer::*;
 use crate::builtins;
 
-// デバッグ用マクロ
-#[cfg(target_arch = "wasm32")]
-macro_rules! console_log {
-    ($($t:tt)*) => {
-        web_sys::console::log_1(&format!($($t)*).into());
-    }
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-macro_rules! console_log {
-    ($($t:tt)*) => {
-        println!($($t)*);
-    }
-}
-
 pub struct Interpreter {
     stack: Stack,
     register: Register,
@@ -44,11 +29,8 @@ impl Interpreter {
     }
     
     pub fn execute(&mut self, code: &str) -> Result<(), String> {
-        console_log!("=== Execute: {}", code);
         let tokens = tokenize(code)?;
-        console_log!("Tokens: {:?}", tokens);
         self.execute_tokens_with_context(&tokens, false)?;
-        console_log!("Stack after execution: {:?}", self.stack);
         Ok(())
     }
     
@@ -58,11 +40,8 @@ impl Interpreter {
     
     fn execute_tokens_with_context(&mut self, tokens: &[Token], in_vector: bool) -> Result<(), String> {
         let mut i = 0;
-        console_log!("Execute tokens with context: in_vector={}, tokens={:?}", in_vector, tokens);
         
         while i < tokens.len() {
-            console_log!("Processing token[{}]: {:?}, stack: {:?}", i, tokens[i], self.stack);
-            
             match &tokens[i] {
                 Token::Comment(_) => {
                     // コメントは無視
@@ -71,13 +50,11 @@ impl Interpreter {
                     self.stack.push(Value {
                         val_type: ValueType::Number(Fraction::new(*n, 1)),
                     });
-                    console_log!("Pushed number: {}", n);
                 },
                 Token::String(s) => {
                     self.stack.push(Value {
                         val_type: ValueType::String(s.clone()),
                     });
-                    console_log!("Pushed string: {}", s);
                 },
                 Token::Boolean(b) => {
                     self.stack.push(Value {
@@ -90,9 +67,7 @@ impl Interpreter {
                     });
                 },
                 Token::VectorStart => {
-                    console_log!("Vector start");
                     let (vector_tokens, consumed) = self.collect_vector(&tokens[i..])?;
-                    console_log!("Collected vector tokens: {:?}", vector_tokens);
                     let saved_stack = self.stack.clone();
                     self.stack.clear();
                     
@@ -100,7 +75,6 @@ impl Interpreter {
                     self.execute_tokens_with_context(&vector_tokens, true)?;
                     
                     let vector_contents = self.stack.clone();
-                    console_log!("Vector contents: {:?}", vector_contents);
                     self.stack = saved_stack;
                     
                     self.stack.push(Value {
@@ -110,36 +84,33 @@ impl Interpreter {
                     i += consumed - 1;
                 },
                 Token::Symbol(name) => {
-    if in_vector {
-        // ベクトル内ではシンボルとしてスタックに積む
-        self.stack.push(Value {
-            val_type: ValueType::Symbol(name.clone()),
-        });
-    } else {
-        // 通常のコンテキストでは実行
-        if let Some(def) = self.dictionary.get(name) {
-            if def.is_builtin {
-                self.execute_builtin(name)?;
-            } else {
-                // カスタムワードの実行時は、in_vectorをfalseで実行
-                // (カスタムワード内のトークンは通常のコンテキストで実行される)
-                self.execute_tokens_with_context(&def.tokens.clone(), false)?;
-            }
-        } else {
-            return Err(format!("Unknown word: {}", name));
-        }
-    }
-},
+                    if in_vector {
+                        // ベクトル内ではシンボルとしてスタックに積む
+                        self.stack.push(Value {
+                            val_type: ValueType::Symbol(name.clone()),
+                        });
+                    } else {
+                        // 通常のコンテキストでは実行
+                        if let Some(def) = self.dictionary.get(name) {
+                            if def.is_builtin {
+                                self.execute_builtin(name)?;
+                            } else {
+                                // カスタムワードの実行
+                                self.execute_tokens_with_context(&def.tokens.clone(), false)?;
+                            }
+                        } else {
+                            return Err(format!("Unknown word: {}", name));
+                        }
+                    }
+                },
                 Token::Operator(op) => {
                     if in_vector {
                         // ベクトル内ではシンボルとしてスタックに積む
                         self.stack.push(Value {
                             val_type: ValueType::Symbol(op.clone()),
                         });
-                        console_log!("Pushed operator as symbol in vector: {}", op);
                     } else {
                         // 通常のコンテキストでは実行
-                        console_log!("Executing operator: {}", op);
                         self.execute_operator(op)?;
                     }
                 },
@@ -153,65 +124,32 @@ impl Interpreter {
         Ok(())
     }
     
-    // op_def関数も修正してデバッグログを追加
-    fn op_def(&mut self) -> Result<(), String> {
-        if self.stack.len() < 2 {
-            return Err(format!("Stack underflow for DEF. Stack has {} items", self.stack.len()));
-        }
+    fn collect_vector(&self, tokens: &[Token]) -> Result<(Vec<Token>, usize), String> {
+        let mut vector_tokens = Vec::new();
+        let mut depth = 0;
+        let mut i = 1; // Skip the opening [
         
-        let name_val = self.stack.pop().unwrap();
-        let body_val = self.stack.pop().unwrap();
-        
-        // デバッグ情報をエラーとして返す（一時的）
-        return Err(format!("DEBUG - DEF: name={:?}, body={:?}", name_val, body_val));
-        
-        console_log!("DEF: name_val = {:?}", name_val);
-        console_log!("DEF: body_val = {:?}", body_val);
-        
-        match (&name_val.val_type, &body_val.val_type) {
-            (ValueType::String(name), ValueType::Vector(body)) => {
-                // ベクトルの内容をトークンに変換
-                let mut tokens = Vec::new();
-                for val in body {
-                    console_log!("DEF: converting value to token: {:?}", val);
-                    match &val.val_type {
-                        ValueType::Number(n) => {
-                            tokens.push(Token::Number(n.numerator));
-                        },
-                        ValueType::String(s) => {
-                            tokens.push(Token::String(s.clone()));
-                        },
-                        ValueType::Boolean(b) => {
-                            tokens.push(Token::Boolean(*b));
-                        },
-                        ValueType::Symbol(s) => {
-                            // オペレーターかどうかチェック
-                            if matches!(s.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
-                                tokens.push(Token::Operator(s.clone()));
-                                console_log!("DEF: {} is operator", s);
-                            } else {
-                                tokens.push(Token::Symbol(s.clone()));
-                                console_log!("DEF: {} is symbol", s);
-                            }
-                        },
-                        ValueType::Nil => {
-                            tokens.push(Token::Nil);
-                        },
-                        _ => return Err("Unsupported value type in word definition".to_string()),
+        while i < tokens.len() {
+            match &tokens[i] {
+                Token::VectorStart => {
+                    depth += 1;
+                    vector_tokens.push(tokens[i].clone());
+                },
+                Token::VectorEnd => {
+                    if depth == 0 {
+                        return Ok((vector_tokens, i + 1));
                     }
+                    depth -= 1;
+                    vector_tokens.push(tokens[i].clone());
+                },
+                _ => {
+                    vector_tokens.push(tokens[i].clone());
                 }
-                
-                console_log!("DEF: definition tokens = {:?}", tokens);
-                
-                self.dictionary.insert(name.clone(), WordDefinition {
-                    tokens,
-                    is_builtin: false,
-                });
-                console_log!("DEF: defined word '{}'", name);
-                Ok(())
-            },
-            _ => Err("Type error: DEF requires a vector and a string".to_string()),
+            }
+            i += 1;
         }
+        
+        Err("Unclosed vector".to_string())
     }
     
     fn execute_builtin(&mut self, name: &str) -> Result<(), String> {
@@ -662,12 +600,19 @@ impl Interpreter {
                             tokens.push(Token::Boolean(*b));
                         },
                         ValueType::Symbol(s) => {
-                            tokens.push(Token::Symbol(s.clone()));
+                            // オペレーターかどうかチェック
+                            if matches!(s.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
+                                tokens.push(Token::Operator(s.clone()));
+                            } else {
+                                tokens.push(Token::Symbol(s.clone()));
+                            }
                         },
                         ValueType::Nil => {
                             tokens.push(Token::Nil);
                         },
-                        _ => return Err("Unsupported value type in word definition".to_string()),
+                        ValueType::Vector(_) => {
+                            return Err("Nested vectors in word definitions are not yet supported".to_string());
+                        }
                     }
                 }
                 
