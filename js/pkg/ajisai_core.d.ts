@@ -7,6 +7,8 @@ export class AjisaiInterpreter {
   get_stack(): any;
   get_register(): any;
   get_custom_words(): string[];
+  get_custom_words_with_descriptions(): any;
+  get_custom_words_info(): any;
   reset(): void;
 }
 
@@ -20,6 +22,8 @@ export interface InitOutput {
   readonly ajisaiinterpreter_get_stack: (a: number) => any;
   readonly ajisaiinterpreter_get_register: (a: number) => any;
   readonly ajisaiinterpreter_get_custom_words: (a: number) => [number, number];
+  readonly ajisaiinterpreter_get_custom_words_with_descriptions: (a: number) => any;
+  readonly ajisaiinterpreter_get_custom_words_info: (a: number) => any;
   readonly ajisaiinterpreter_reset: (a: number) => void;
   readonly __wbindgen_exn_store: (a: number) => void;
   readonly __externref_table_alloc: () => number;

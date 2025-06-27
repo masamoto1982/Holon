@@ -250,6 +250,20 @@ export class AjisaiInterpreter {
         wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
         return v1;
     }
+    /**
+     * @returns {any}
+     */
+    get_custom_words_with_descriptions() {
+        const ret = wasm.ajisaiinterpreter_get_custom_words_with_descriptions(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @returns {any}
+     */
+    get_custom_words_info() {
+        const ret = wasm.ajisaiinterpreter_get_custom_words_info(this.__wbg_ptr);
+        return ret;
+    }
     reset() {
         wasm.ajisaiinterpreter_reset(this.__wbg_ptr);
     }
