@@ -77,6 +77,22 @@ impl AjisaiInterpreter {
     pub fn reset(&mut self) {
         self.interpreter = Interpreter::new();
     }
+
+    #[wasm_bindgen]
+    pub fn get_custom_words_info(&self) -> JsValue {
+        let words_info = self.interpreter.get_custom_words_info();
+        let arr = js_sys::Array::new();
+        
+        for (name, desc, protected) in words_info {
+            let word_arr = js_sys::Array::new();
+            word_arr.push(&JsValue::from_str(&name));
+            word_arr.push(&desc.map(|d| JsValue::from_str(&d)).unwrap_or(JsValue::NULL));
+            word_arr.push(&JsValue::from_bool(protected));
+            arr.push(&word_arr);
+        }
+        
+        arr.into()
+    }
 }
 
 fn value_to_js(value: &Value) -> JsValue {
