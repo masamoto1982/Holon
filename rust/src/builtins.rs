@@ -29,11 +29,13 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     // 辞書操作
     register_builtin(dictionary, "WORDS");
     register_builtin(dictionary, "WORDS?");
+    register_builtin(dictionary, "DEL");
 }
 
 fn register_builtin(dictionary: &mut HashMap<String, WordDefinition>, name: &str) {
     dictionary.insert(name.to_string(), WordDefinition {
         tokens: vec![],
         is_builtin: true,
+        description: None,  // 追加
     });
 }
