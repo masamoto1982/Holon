@@ -117,7 +117,7 @@ fn value_to_js(value: &Value) -> JsValue {
                 if n.numerator >= -(1i64 << 53) && n.numerator <= (1i64 << 53) {
                     JsValue::from_f64(n.numerator as f64)
                 } else {
-                    // 大きすぎる数値は文字列として返す
+                    // 大きすぎる数値は文字列として返
                     JsValue::from_str(&n.numerator.to_string())
                 }
             } else {
