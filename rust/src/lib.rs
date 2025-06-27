@@ -23,6 +23,21 @@ impl AjisaiInterpreter {
     }
 
     #[wasm_bindgen]
+    pub fn get_custom_words_with_descriptions(&self) -> JsValue {
+        let words = self.interpreter.get_custom_words_with_descriptions();
+        let arr = js_sys::Array::new();
+        
+        for (name, desc) in words {
+            let word_arr = js_sys::Array::new();
+            word_arr.push(&JsValue::from_str(&name));
+            word_arr.push(&desc.map(|d| JsValue::from_str(&d)).unwrap_or(JsValue::NULL));
+            arr.push(&word_arr);
+        }
+        
+        arr.into()
+    }
+
+    #[wasm_bindgen]
     pub fn execute(&mut self, code: &str) -> Result<String, String> {
         match self.interpreter.execute(code) {
             Ok(()) => Ok("OK".to_string()),
