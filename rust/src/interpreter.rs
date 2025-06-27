@@ -110,28 +110,26 @@ impl Interpreter {
                     i += consumed - 1;
                 },
                 Token::Symbol(name) => {
-                    if in_vector {
-                        // ベクトル内ではシンボルとしてスタックに積む
-                        self.stack.push(Value {
-                            val_type: ValueType::Symbol(name.clone()),
-                        });
-                        console_log!("Pushed symbol in vector: {}", name);
-                    } else {
-                        // 通常のコンテキストでは実行
-                        console_log!("Executing symbol: {}", name);
-                        if let Some(def) = self.dictionary.get(name) {
-                            if def.is_builtin {
-                                console_log!("Executing builtin: {}", name);
-                                self.execute_builtin(name)?;
-                            } else {
-                                console_log!("Executing custom word: {}", name);
-                                self.execute_tokens(&def.tokens.clone())?;
-                            }
-                        } else {
-                            return Err(format!("Unknown word: {}", name));
-                        }
-                    }
-                },
+    if in_vector {
+        // ベクトル内ではシンボルとしてスタックに積む
+        self.stack.push(Value {
+            val_type: ValueType::Symbol(name.clone()),
+        });
+    } else {
+        // 通常のコンテキストでは実行
+        if let Some(def) = self.dictionary.get(name) {
+            if def.is_builtin {
+                self.execute_builtin(name)?;
+            } else {
+                // カスタムワードの実行時は、in_vectorをfalseで実行
+                // (カスタムワード内のトークンは通常のコンテキストで実行される)
+                self.execute_tokens_with_context(&def.tokens.clone(), false)?;
+            }
+        } else {
+            return Err(format!("Unknown word: {}", name));
+        }
+    }
+},
                 Token::Operator(op) => {
                     if in_vector {
                         // ベクトル内ではシンボルとしてスタックに積む
