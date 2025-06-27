@@ -12,6 +12,7 @@ pub struct Interpreter {
 pub struct WordDefinition {
     pub tokens: Vec<Token>,
     pub is_builtin: bool,
+    pub description: Option<String>,  // 追加
 }
 
 impl Interpreter {
