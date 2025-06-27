@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::types::*;
 use crate::tokenizer::*;
 use crate::builtins;
@@ -7,12 +7,13 @@ pub struct Interpreter {
     stack: Stack,
     register: Register,
     dictionary: HashMap<String, WordDefinition>,
+    dependencies: HashMap<String, HashSet<String>>, // word -> それを使用しているワードのセット
 }
 
 pub struct WordDefinition {
     pub tokens: Vec<Token>,
     pub is_builtin: bool,
-    pub description: Option<String>,  // 追加
+    pub description: Option<String>,
 }
 
 impl Interpreter {
@@ -21,6 +22,7 @@ impl Interpreter {
             stack: Vec::new(),
             register: None,
             dictionary: HashMap::new(),
+            dependencies: HashMap::new(),
         };
         
         // 組み込みワードを登録
@@ -41,11 +43,13 @@ impl Interpreter {
     
     fn execute_tokens_with_context(&mut self, tokens: &[Token], in_vector: bool) -> Result<(), String> {
         let mut i = 0;
+        let mut last_comment: Option<String> = None;
         
         while i < tokens.len() {
             match &tokens[i] {
-                Token::Comment(_) => {
-                    // コメントは無視
+                Token::Comment(text) => {
+                    // コメントを保存（DEFの直前で使用される可能性）
+                    last_comment = Some(text.trim().to_string());
                 },
                 Token::Number(n) => {
                     self.stack.push(Value {
@@ -94,7 +98,12 @@ impl Interpreter {
                         // 通常のコンテキストでは実行
                         if let Some(def) = self.dictionary.get(name) {
                             if def.is_builtin {
-                                self.execute_builtin(name)?;
+                                // DEFの場合、コメントを渡す
+                                if name == "DEF" && last_comment.is_some() {
+                                    self.execute_builtin_with_comment(name, last_comment.take())?;
+                                } else {
+                                    self.execute_builtin(name)?;
+                                }
                             } else {
                                 // カスタムワードの実行
                                 self.execute_tokens_with_context(&def.tokens.clone(), false)?;
@@ -119,6 +128,12 @@ impl Interpreter {
                     return Err(format!("Unexpected token: {:?}", tokens[i]));
                 }
             }
+            
+            // コメント以外のトークンが処理されたらコメントをクリア（DEF以外で使用されないように）
+            if !matches!(&tokens[i], Token::Comment(_)) && !matches!(&tokens[i], Token::Symbol(s) if s == "DEF") {
+                last_comment = None;
+            }
+            
             i += 1;
         }
         
@@ -173,7 +188,16 @@ impl Interpreter {
             "NTH" => self.op_nth()?,
             "WORDS" => self.op_words()?,
             "WORDS?" => self.op_words_filter()?,
+            "DEL" => self.op_del()?,
             _ => return Err(format!("Unknown builtin: {}", name)),
+        }
+        Ok(())
+    }
+    
+    fn execute_builtin_with_comment(&mut self, name: &str, comment: Option<String>) -> Result<(), String> {
+        match name {
+            "DEF" => self.op_def_with_comment(comment)?,
+            _ => self.execute_builtin(name)?,
         }
         Ok(())
     }
@@ -191,6 +215,54 @@ impl Interpreter {
             "<=" => self.op_le()?,
             _ => return Err(format!("Unknown operator: {}", op)),
         }
+        Ok(())
+    }
+    
+    // ワードの依存関係を収集
+    fn collect_dependencies(tokens: &[Token]) -> HashSet<String> {
+        let mut deps = HashSet::new();
+        for token in tokens {
+            if let Token::Symbol(name) = token {
+                deps.insert(name.clone());
+            }
+        }
+        deps
+    }
+    
+    // ワードの削除（DEL命令用）
+    pub fn delete_word(&mut self, name: &str) -> Result<(), String> {
+        // 組み込みワードは削除不可
+        if let Some(def) = self.dictionary.get(name) {
+            if def.is_builtin {
+                return Err(format!("Cannot delete builtin word: {}", name));
+            }
+        } else {
+            return Err(format!("Word not found: {}", name));
+        }
+        
+        // 依存関係チェック
+        if let Some(dependents) = self.dependencies.get(name) {
+            if !dependents.is_empty() {
+                let dependent_list: Vec<String> = dependents.iter().cloned().collect();
+                return Err(format!(
+                    "Cannot delete '{}' because it is used by: {}", 
+                    name, 
+                    dependent_list.join(", ")
+                ));
+            }
+        }
+        
+        // ワードを削除
+        self.dictionary.remove(name);
+        
+        // このワードが依存していた他のワードから、依存関係を削除
+        for (_, deps) in self.dependencies.iter_mut() {
+            deps.remove(name);
+        }
+        
+        // 依存関係エントリ自体も削除
+        self.dependencies.remove(name);
+        
         Ok(())
     }
     
@@ -578,6 +650,10 @@ impl Interpreter {
     
     // 制御構造
     fn op_def(&mut self) -> Result<(), String> {
+        self.op_def_with_comment(None)
+    }
+    
+    fn op_def_with_comment(&mut self, description: Option<String>) -> Result<(), String> {
         if self.stack.len() < 2 {
             return Err("Stack underflow for DEF".to_string());
         }
@@ -587,8 +663,31 @@ impl Interpreter {
         
         match (&name_val.val_type, &body_val.val_type) {
             (ValueType::String(name), ValueType::Vector(body)) => {
+                // 組み込みワードの再定義を防ぐ
+                if let Some(existing) = self.dictionary.get(name) {
+                    if existing.is_builtin {
+                        return Err(format!("Cannot redefine builtin word: {}", name));
+                    }
+                }
+                
+                // 既存のカスタムワードを再定義する場合、依存関係をチェック
+                if self.dictionary.contains_key(name) {
+                    if let Some(dependents) = self.dependencies.get(name) {
+                        if !dependents.is_empty() {
+                            let dependent_list: Vec<String> = dependents.iter().cloned().collect();
+                            return Err(format!(
+                                "Cannot redefine '{}' because it is used by: {}", 
+                                name, 
+                                dependent_list.join(", ")
+                            ));
+                        }
+                    }
+                }
+                
                 // ベクトルの内容をトークンに変換
                 let mut tokens = Vec::new();
+                let mut used_words = HashSet::new();
+                
                 for val in body {
                     match &val.val_type {
                         ValueType::Number(n) => {
@@ -606,6 +705,10 @@ impl Interpreter {
                                 tokens.push(Token::Operator(s.clone()));
                             } else {
                                 tokens.push(Token::Symbol(s.clone()));
+                                // カスタムワードの使用を記録
+                                if self.dictionary.contains_key(s) && !self.dictionary.get(s).unwrap().is_builtin {
+                                    used_words.insert(s.clone());
+                                }
                             }
                         },
                         ValueType::Nil => {
@@ -617,10 +720,32 @@ impl Interpreter {
                     }
                 }
                 
+                // 古い依存関係を削除
+                if self.dictionary.contains_key(name) {
+                    // 以前このワードが依存していたワードから、依存関係を削除
+                    let old_deps = Self::collect_dependencies(&self.dictionary.get(name).unwrap().tokens);
+                    for dep in old_deps {
+                        if let Some(deps) = self.dependencies.get_mut(&dep) {
+                            deps.remove(name);
+                        }
+                    }
+                }
+                
+                // 新しい依存関係を追加
+                for used_word in &used_words {
+                    self.dependencies
+                        .entry(used_word.clone())
+                        .or_insert_with(HashSet::new)
+                        .insert(name.clone());
+                }
+                
+                // ワードを定義
                 self.dictionary.insert(name.clone(), WordDefinition {
                     tokens,
                     is_builtin: false,
+                    description,
                 });
+                
                 Ok(())
             },
             _ => Err("Type error: DEF requires a vector and a string".to_string()),
@@ -688,6 +813,20 @@ impl Interpreter {
         }
     }
     
+    // DEL命令の実装
+    fn op_del(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            match val.val_type {
+                ValueType::String(name) => {
+                    self.delete_word(&name)
+                },
+                _ => Err("Type error: DEL requires a string".to_string()),
+            }
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
     // Public methods for WASM interface
     pub fn get_stack(&self) -> &Stack {
         &self.stack
@@ -705,5 +844,43 @@ impl Interpreter {
             .collect();
         words.sort();
         words
+    }
+    
+    // カスタムワードを説明付きで取得
+    pub fn get_custom_words_with_descriptions(&self) -> Vec<(String, Option<String>)> {
+        let mut words: Vec<(String, Option<String>)> = self.dictionary
+            .iter()
+            .filter(|(_, def)| !def.is_builtin)
+            .map(|(name, def)| (name.clone(), def.description.clone()))
+            .collect();
+        words.sort_by(|a, b| a.0.cmp(&b.0));
+        words
+    }
+    
+    // カスタムワードの情報を取得（保護状態を含む）
+    pub fn get_custom_words_info(&self) -> Vec<(String, Option<String>, bool)> {
+        let mut words: Vec<(String, Option<String>, bool)> = self.dictionary
+            .iter()
+            .filter(|(_, def)| !def.is_builtin)
+            .map(|(name, def)| {
+                // このワードが他のワードから依存されているかチェック
+                let is_protected = self.dependencies.get(name)
+                    .map(|deps| !deps.is_empty())
+                    .unwrap_or(false);
+                
+                (name.clone(), def.description.clone(), is_protected)
+            })
+            .collect();
+        words.sort_by(|a, b| a.0.cmp(&b.0));
+        words
+    }
+    
+    // 依存関係情報を取得
+    pub fn get_dependencies(&self, word: &str) -> Vec<String> {
+        if let Some(deps) = self.dependencies.get(word) {
+            deps.iter().cloned().collect()
+        } else {
+            Vec::new()
+        }
     }
 }
