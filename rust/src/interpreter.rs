@@ -42,103 +42,90 @@ impl Interpreter {
     }
     
     fn execute_tokens_with_context(&mut self, tokens: &[Token], in_vector: bool) -> Result<(), String> {
-        let mut i = 0;
-        let mut last_comment: Option<String> = None;
-        
-        while i < tokens.len() {
-            match &tokens[i] {
-                Token::Comment(text) => {
-                    // コメントを保存（DEFの直前で使用される可能性）
-                    last_comment = Some(text.trim().to_string());
-                },
-                Token::Number(n) => {
+    let mut i = 0;
+    let mut last_comment: Option<String> = None;
+    
+    while i < tokens.len() {
+        match &tokens[i] {
+            Token::Comment(text) => {
+                last_comment = Some(text.trim().to_string());
+            },
+            Token::Number(num, den) => {
+                self.stack.push(Value {
+                    val_type: ValueType::Number(Fraction::new(*num, *den)),
+                });
+            },
+            Token::String(s) => {
+                self.stack.push(Value {
+                    val_type: ValueType::String(s.clone()),
+                });
+            },
+            Token::Boolean(b) => {
+                self.stack.push(Value {
+                    val_type: ValueType::Boolean(*b),
+                });
+            },
+            Token::Nil => {
+                self.stack.push(Value {
+                    val_type: ValueType::Nil,
+                });
+            },
+            Token::VectorStart => {
+                let (vector_tokens, consumed) = self.collect_vector(&tokens[i..])?;
+                let saved_stack = self.stack.clone();
+                self.stack.clear();
+                
+                self.execute_tokens_with_context(&vector_tokens, true)?;
+                
+                let vector_contents = self.stack.clone();
+                self.stack = saved_stack;
+                
+                self.stack.push(Value {
+                    val_type: ValueType::Vector(vector_contents),
+                });
+                
+                i += consumed - 1;
+            },
+            Token::Symbol(name) => {
+                if in_vector {
+                    // ベクトル内ではシンボルとしてスタックに積む
                     self.stack.push(Value {
-                        val_type: ValueType::Number(Fraction::new(*n, 1)),
+                        val_type: ValueType::Symbol(name.clone()),
                     });
-                },
-                Token::String(s) => {
-                    self.stack.push(Value {
-                        val_type: ValueType::String(s.clone()),
-                    });
-                },
-                Token::Boolean(b) => {
-                    self.stack.push(Value {
-                        val_type: ValueType::Boolean(*b),
-                    });
-                },
-                Token::Nil => {
-                    self.stack.push(Value {
-                        val_type: ValueType::Nil,
-                    });
-                },
-                Token::VectorStart => {
-                    let (vector_tokens, consumed) = self.collect_vector(&tokens[i..])?;
-                    let saved_stack = self.stack.clone();
-                    self.stack.clear();
-                    
-                    // ベクトル内のトークンを実行（ベクトルコンテキストで）
-                    self.execute_tokens_with_context(&vector_tokens, true)?;
-                    
-                    let vector_contents = self.stack.clone();
-                    self.stack = saved_stack;
-                    
-                    self.stack.push(Value {
-                        val_type: ValueType::Vector(vector_contents),
-                    });
-                    
-                    i += consumed - 1;
-                },
-                Token::Symbol(name) => {
-                    if in_vector {
-                        // ベクトル内ではシンボルとしてスタックに積む
-                        self.stack.push(Value {
-                            val_type: ValueType::Symbol(name.clone()),
-                        });
-                    } else {
-                        // 通常のコンテキストでは実行
-                        if let Some(def) = self.dictionary.get(name) {
-                            if def.is_builtin {
-                                // DEFの場合、コメントを渡す
-                                if name == "DEF" && last_comment.is_some() {
-                                    self.execute_builtin_with_comment(name, last_comment.take())?;
-                                } else {
-                                    self.execute_builtin(name)?;
-                                }
+                } else {
+                    // 通常のコンテキストでは実行
+                    // まず演算子として扱えるかチェック
+                    if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
+                        self.execute_operator(name)?;
+                    } else if let Some(def) = self.dictionary.get(name) {
+                        if def.is_builtin {
+                            if name == "DEF" && last_comment.is_some() {
+                                self.execute_builtin_with_comment(name, last_comment.take())?;
                             } else {
-                                // カスタムワードの実行
-                                self.execute_tokens_with_context(&def.tokens.clone(), false)?;
+                                self.execute_builtin(name)?;
                             }
                         } else {
-                            return Err(format!("Unknown word: {}", name));
+                            self.execute_tokens_with_context(&def.tokens.clone(), false)?;
                         }
-                    }
-                },
-                Token::Operator(op) => {
-                    if in_vector {
-                        // ベクトル内ではシンボルとしてスタックに積む
-                        self.stack.push(Value {
-                            val_type: ValueType::Symbol(op.clone()),
-                        });
                     } else {
-                        // 通常のコンテキストでは実行
-                        self.execute_operator(op)?;
+                        return Err(format!("Unknown word: {}", name));
                     }
-                },
-                _ => {
-                    return Err(format!("Unexpected token: {:?}", tokens[i]));
                 }
+            },
+            _ => {
+                return Err(format!("Unexpected token: {:?}", tokens[i]));
             }
-            
-            // コメント以外のトークンが処理されたらコメントをクリア（DEF以外で使用されないように）
-            if !matches!(&tokens[i], Token::Comment(_)) && !matches!(&tokens[i], Token::Symbol(s) if s == "DEF") {
-                last_comment = None;
-            }
-            
-            i += 1;
         }
         
-        Ok(())
+        if !matches!(&tokens[i], Token::Comment(_)) && !matches!(&tokens[i], Token::Symbol(s) if s == "DEF") {
+            last_comment = None;
+        }
+        
+        i += 1;
     }
+    
+    Ok(())
+}
     
     fn collect_vector(&self, tokens: &[Token]) -> Result<(Vec<Token>, usize), String> {
         let mut vector_tokens = Vec::new();
