@@ -179,20 +179,17 @@ renderWordButtons(container, words, isCustom = false) {
 },
     
     // ワードの挿入
-    insertWord(word, isCustom = false) {
+insertWord(word, isCustom = false) {
     const input = this.elements.codeInput;
     const start = input.selectionStart;
     const end = input.selectionEnd;
     const text = input.value;
     
-    // カスタムワードの場合は symbol: プレフィックスを付ける
-    const insertText = isCustom ? `symbol:${word}` : word;
-    
     // カーソル位置に挿入
-    input.value = text.substring(0, start) + insertText + text.substring(end);
+    input.value = text.substring(0, start) + word + text.substring(end);
     
     // カーソル位置を更新
-    const newPos = start + insertText.length;
+    const newPos = start + word.length;
     input.selectionStart = newPos;
     input.selectionEnd = newPos;
     
