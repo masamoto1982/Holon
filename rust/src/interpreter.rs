@@ -669,6 +669,14 @@ impl Interpreter {
                         ));
                     }
                 }
+                // 依存関係がなければ、古い定義の依存関係を削除
+                let old_def = self.dictionary.get(name).unwrap();
+                let old_deps = Self::collect_dependencies(&old_def.tokens);
+                for dep in old_deps {
+                    if let Some(deps) = self.dependencies.get_mut(&dep) {
+                        deps.remove(name);
+                    }
+                }
             }
             
             // ベクトルの内容をトークンに変換
@@ -702,17 +710,6 @@ impl Interpreter {
                 }
             }
             
-            // 古い依存関係を削除
-            if self.dictionary.contains_key(name) {
-                // 以前このワードが依存していたワードから、依存関係を削除
-                let old_deps = Self::collect_dependencies(&self.dictionary.get(name).unwrap().tokens);
-                for dep in old_deps {
-                    if let Some(deps) = self.dependencies.get_mut(&dep) {
-                        deps.remove(name);
-                    }
-                }
-            }
-            
             // 新しい依存関係を追加
             for used_word in &used_words {
                 self.dependencies
@@ -721,7 +718,7 @@ impl Interpreter {
                     .insert(name.clone());
             }
             
-            // ワードを定義
+            // ワードを定義（新規または上書き）
             self.dictionary.insert(name.clone(), WordDefinition {
                 tokens,
                 is_builtin: false,
