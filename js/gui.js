@@ -245,20 +245,24 @@ async executeCode() {
             this.updateRegisterDisplay(this.convertWasmValue(register));
             
             // カスタムワードを更新（説明と保護状態付き）
-            const customWordsInfo = window.ajisaiInterpreter.get_custom_words_info();
-            const customWordInfos = customWordsInfo.map(wordData => {
-                // wordDataが配列の場合: [名前, 説明, 保護状態]
-                if (Array.isArray(wordData)) {
-                    return {
-                        name: wordData[0],
-                        description: wordData[1] || null,
-                        protected: wordData[2] || false
-                    };
-                } else {
-                    // 後方互換性のため
-                    return wordData;
-                }
-            });
+const customWordsInfo = window.ajisaiInterpreter.get_custom_words_info();
+console.log('Custom words info:', customWordsInfo); // デバッグログ
+
+const customWordInfos = customWordsInfo.map(wordData => {
+    // wordDataが配列の場合: [名前, 説明, 保護状態]
+    if (Array.isArray(wordData)) {
+        const info = {
+            name: wordData[0],
+            description: wordData[1] || null,
+            protected: wordData[2] || false
+        };
+        console.log('Word info:', info); // デバッグログ
+        return info;
+    } else {
+        // 後方互換性のため
+        return wordData;
+    }
+});
             this.renderWordButtons(this.elements.customWordsDisplay, customWordInfos, true);
             
             // 成功時はテキストエディタをクリア
