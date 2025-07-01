@@ -771,29 +771,31 @@ impl Interpreter {
     }
     
     fn op_words_filter(&mut self) -> Result<(), String> {
-        if let Some(val) = self.stack.pop() {
-            match val.val_type {
-                ValueType::String(prefix) => {
-                    let mut words: Vec<String> = self.dictionary
-                        .keys()
-                        .filter(|k| k.starts_with(&prefix))
-                        .cloned()
-                        .collect();
-                    words.sort();
-                    
-                    for word in words {
-                        self.stack.push(Value {
-                            val_type: ValueType::String(word),
-                        });
-                    }
-                    Ok(())
-                },
-                _ => Err("Type error: WORDS? requires a string".to_string()),
-            }
-        } else {
-            Err("Stack underflow".to_string())
+    if let Some(val) = self.stack.pop() {
+        match val.val_type {
+            ValueType::String(prefix) => {
+                // プレフィックスも大文字に正規化
+                let prefix = prefix.to_uppercase();
+                let mut words: Vec<String> = self.dictionary
+                    .keys()
+                    .filter(|k| k.starts_with(&prefix))
+                    .cloned()
+                    .collect();
+                words.sort();
+                
+                for word in words {
+                    self.stack.push(Value {
+                        val_type: ValueType::String(word),
+                    });
+                }
+                Ok(())
+            },
+            _ => Err("Type error: WORDS? requires a string".to_string()),
         }
+    } else {
+        Err("Stack underflow".to_string())
     }
+}
     
     // DEL命令の実装
     fn op_del(&mut self) -> Result<(), String> {
