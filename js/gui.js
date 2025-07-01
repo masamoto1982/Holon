@@ -160,16 +160,8 @@ renderWordButtons(container, words, isCustom = false) {
             button.classList.add('deletable');
         }
         
-        // 説明がある場合はツールチップを設定
-        if (description) {
-            button.title = description;
-        } else if (!isCustom) {
-            button.title = "組み込みワード（削除・上書き不可）";
-        } else if (isProtected) {
-            button.title = "他のワードから使用されています（削除・上書き不可）";
-        } else {
-            button.title = "カスタムワード（削除・上書き可能）";
-        }
+        // 説明がある場合はそれを表示、なければワード名のみ
+        button.title = description || word;
         
         button.addEventListener('click', () => {
             this.insertWord(word, isCustom);
