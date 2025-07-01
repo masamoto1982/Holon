@@ -42,92 +42,110 @@ impl Interpreter {
     }
     
     fn execute_tokens_with_context(&mut self, tokens: &[Token], in_vector: bool) -> Result<(), String> {
-        let mut i = 0;
-        let mut pending_description: Option<String> = None;
-        
-        while i < tokens.len() {
-            match &tokens[i] {
-                Token::Description(text) => {
-                    // DEFの後の説明文として保持
-                    pending_description = Some(text.clone());
-                },
-                Token::Number(num, den) => {
+    let mut i = 0;
+    let mut pending_description: Option<String> = None;
+    
+    while i < tokens.len() {
+        match &tokens[i] {
+            Token::Description(text) => {
+                // DEFの後の説明文として保持
+                pending_description = Some(text.clone());
+            },
+            Token::Number(num, den) => {
+                self.stack.push(Value {
+                    val_type: ValueType::Number(Fraction::new(*num, *den)),
+                });
+            },
+            Token::String(s) => {
+                self.stack.push(Value {
+                    val_type: ValueType::String(s.clone()),
+                });
+            },
+            Token::Boolean(b) => {
+                self.stack.push(Value {
+                    val_type: ValueType::Boolean(*b),
+                });
+            },
+            Token::Nil => {
+                self.stack.push(Value {
+                    val_type: ValueType::Nil,
+                });
+            },
+            Token::VectorStart => {
+                let (vector_tokens, consumed) = self.collect_vector(&tokens[i..])?;
+                let saved_stack = self.stack.clone();
+                self.stack.clear();
+                
+                self.execute_tokens_with_context(&vector_tokens, true)?;
+                
+                let vector_contents = self.stack.clone();
+                self.stack = saved_stack;
+                
+                self.stack.push(Value {
+                    val_type: ValueType::Vector(vector_contents),
+                });
+                
+                i += consumed - 1;
+            },
+            Token::Symbol(name) => {
+                if in_vector {
+                    // ベクトル内ではシンボルとしてスタックに積む
                     self.stack.push(Value {
-                        val_type: ValueType::Number(Fraction::new(*num, *den)),
+                        val_type: ValueType::Symbol(name.clone()),
                     });
-                },
-                Token::String(s) => {
-                    self.stack.push(Value {
-                        val_type: ValueType::String(s.clone()),
-                    });
-                },
-                Token::Boolean(b) => {
-                    self.stack.push(Value {
-                        val_type: ValueType::Boolean(*b),
-                    });
-                },
-                Token::Nil => {
-                    self.stack.push(Value {
-                        val_type: ValueType::Nil,
-                    });
-                },
-                Token::VectorStart => {
-                    let (vector_tokens, consumed) = self.collect_vector(&tokens[i..])?;
-                    let saved_stack = self.stack.clone();
-                    self.stack.clear();
-                    
-                    self.execute_tokens_with_context(&vector_tokens, true)?;
-                    
-                    let vector_contents = self.stack.clone();
-                    self.stack = saved_stack;
-                    
-                    self.stack.push(Value {
-                        val_type: ValueType::Vector(vector_contents),
-                    });
-                    
-                    i += consumed - 1;
-                },
-                Token::Symbol(name) => {
-                    if in_vector {
-                        // ベクトル内ではシンボルとしてスタックに積む
-                        self.stack.push(Value {
-                            val_type: ValueType::Symbol(name.clone()),
-                        });
-                    } else {
-                        // 通常のコンテキストでは実行
-                        // まず演算子として扱えるかチェック
-                        if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
-                            self.execute_operator(name)?;
-                        } else if let Some(def) = self.dictionary.get(name) {
-                            if def.is_builtin {
-                                if name == "DEF" && pending_description.is_some() {
-                                    self.execute_builtin_with_comment(name, pending_description.take())?;
-                                } else {
-                                    self.execute_builtin(name)?;
+                } else {
+                    // 通常のコンテキストでは実行
+                    // まず演算子として扱えるかチェック
+                    if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
+                        self.execute_operator(name)?;
+                    } else if let Some(def) = self.dictionary.get(name) {
+                        if def.is_builtin {
+                            if name == "DEF" {
+                                // DEFの場合、次のトークンが説明文かチェック
+                                let mut description = None;
+                                if i + 1 < tokens.len() {
+                                    if let Token::Description(text) = &tokens[i + 1] {
+                                        description = Some(text.clone());
+                                        i += 1; // 説明文トークンをスキップ
+                                    }
                                 }
+                                // pending_descriptionがあればそれを優先
+                                if pending_description.is_some() {
+                                    description = pending_description.take();
+                                }
+                                self.execute_builtin_with_comment(name, description)?;
                             } else {
-                                self.execute_tokens_with_context(&def.tokens.clone(), false)?;
+                                self.execute_builtin(name)?;
                             }
                         } else {
-                            return Err(format!("Unknown word: {}", name));
+                            self.execute_tokens_with_context(&def.tokens.clone(), false)?;
                         }
+                    } else {
+                        return Err(format!("Unknown word: {}", name));
                     }
-                },
-                _ => {
-                    return Err(format!("Unexpected token: {:?}", tokens[i]));
                 }
+            },
+            _ => {
+                return Err(format!("Unexpected token: {:?}", tokens[i]));
             }
-            
-            // DEF以外の命令の後は説明文をクリア
-            if !matches!(&tokens[i], Token::Description(_)) && !matches!(&tokens[i], Token::Symbol(s) if s == "DEF") {
-                pending_description = None;
-            }
-            
-            i += 1;
         }
         
-        Ok(())
+        // Descriptionトークンとそれを使用したDEF以外で説明文をクリア
+        if !matches!(&tokens[i], Token::Description(_)) {
+            if let Token::Symbol(s) = &tokens[i] {
+                if s != "DEF" || i == 0 || !matches!(&tokens[i-1], Token::Description(_)) {
+                    pending_description = None;
+                }
+            } else {
+                pending_description = None;
+            }
+        }
+        
+        i += 1;
     }
+    
+    Ok(())
+}
     
     fn collect_vector(&self, tokens: &[Token]) -> Result<(Vec<Token>, usize), String> {
         let mut vector_tokens = Vec::new();
