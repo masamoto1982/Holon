@@ -7,7 +7,7 @@ pub enum Token {
     VectorStart,
     VectorEnd,
     Nil,
-    Comment(String),
+    Description(String),
 }
 
 pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
@@ -21,18 +21,30 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
             continue;
         }
         
-        // コメント処理
+        // 行コメント処理（#から行末まで）
+        if ch == '#' {
+            chars.next();
+            while let Some(&ch) = chars.peek() {
+                chars.next();
+                if ch == '\n' {
+                    break;
+                }
+            }
+            continue;
+        }
+        
+        // 説明文処理（DEF用）
         if ch == '(' {
             chars.next();
-            let mut comment = String::new();
+            let mut description = String::new();
             while let Some(&ch) = chars.peek() {
                 chars.next();
                 if ch == ')' {
                     break;
                 }
-                comment.push(ch);
+                description.push(ch);
             }
-            tokens.push(Token::Comment(comment));
+            tokens.push(Token::Description(description.trim().to_string()));
             continue;
         }
         
@@ -75,7 +87,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
         // その他のトークン（数値、真偽値、NIL、シンボル）
         let mut word = String::new();
         while let Some(&ch) = chars.peek() {
-            if ch.is_whitespace() || ch == '(' || ch == '[' || ch == ']' || ch == '"' {
+            if ch.is_whitespace() || ch == '(' || ch == '[' || ch == ']' || ch == '"' || ch == '#' {
                 break;
             }
             word.push(ch);
@@ -116,6 +128,7 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 },
             }
         }
+    }
     
     Ok(tokens)
 }
