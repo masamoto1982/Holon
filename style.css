@@ -187,17 +187,17 @@ button:hover {
     background-color: #e0e0e0;
 }
 
-/* 組み込みワード（削除・上書き不可） */
-.word-button.builtin,.word-button.protected {
+/* 変更不可 */
+.word-button.builtin, .word-button.protected {
     border-color: #dc3545;  /* 赤色の縁取り */
     background-color: #fff5f5;
 }
 
-.word-button.builtin:hover {
+.word-button.builtin:hover, .word-button.protected:hover {
     background-color: #ffe0e0;
 }
 
-/* 通常のカスタムワード（削除・上書き可能） */
+/* 変更可能 */
 .word-button.deletable {
     border-color: #28a745;  /* 緑色の縁取り */
     background-color: #f0fff4;
