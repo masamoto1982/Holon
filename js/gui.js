@@ -120,14 +120,37 @@ const GUI = {
     },
     
     // 辞書の描画
-    renderDictionary() {
-    // 組み込みワード
+renderDictionary() {
+    // 組み込みワード（説明付き）
     const builtinWords = [
-        '+', '-', '*', '/', '=', '>', '>=', '<', '<=',
-        'DUP', 'DROP', 'SWAP', 'OVER', 'ROT',
-        '>R', 'R>', 'R@',
-        'LENGTH', 'HEAD', 'TAIL', 'CONS', 'REVERSE', 'NTH',
-        'DEF', 'IF', 'WORDS', 'WORDS?'
+        { name: '+', description: '加算 ( a b -- a+b )' },
+        { name: '-', description: '減算 ( a b -- a-b )' },
+        { name: '*', description: '乗算 ( a b -- a*b )' },
+        { name: '/', description: '除算 ( a b -- a/b )' },
+        { name: '=', description: '等しい ( a b -- bool )' },
+        { name: '>', description: 'より大きい ( a b -- bool )' },
+        { name: '>=', description: '以上 ( a b -- bool )' },
+        { name: '<', description: 'より小さい ( a b -- bool )' },
+        { name: '<=', description: '以下 ( a b -- bool )' },
+        { name: 'DUP', description: 'スタックトップを複製 ( a -- a a )' },
+        { name: 'DROP', description: 'スタックトップを削除 ( a -- )' },
+        { name: 'SWAP', description: '上位2つを交換 ( a b -- b a )' },
+        { name: 'OVER', description: '2番目をコピー ( a b -- a b a )' },
+        { name: 'ROT', description: '3番目を最上位へ ( a b c -- b c a )' },
+        { name: '>R', description: 'スタックからレジスタへ移動 ( a -- )' },
+        { name: 'R>', description: 'レジスタからスタックへ移動 ( -- a )' },
+        { name: 'R@', description: 'レジスタの値をコピー ( -- a )' },
+        { name: 'LENGTH', description: 'ベクトルの長さ ( vec -- n )' },
+        { name: 'HEAD', description: '最初の要素 ( vec -- elem )' },
+        { name: 'TAIL', description: '最初以外の要素 ( vec -- vec\' )' },
+        { name: 'CONS', description: '要素を先頭に追加 ( elem vec -- vec\' )' },
+        { name: 'REVERSE', description: 'ベクトルを逆順に ( vec -- vec\' )' },
+        { name: 'NTH', description: 'N番目の要素を取得（負数は末尾から） ( n vec -- elem )' },
+        { name: 'DEF', description: '新しいワードを定義 ( vec str -- )' },
+        { name: 'IF', description: '条件分岐 ( bool vec vec -- ... )' },
+        { name: 'WORDS', description: '全ワードをスタックに積む ( -- str... )' },
+        { name: 'WORDS?', description: 'プレフィックスでフィルタ ( str -- str... )' },
+        { name: 'DEL', description: 'カスタムワードを削除 ( str -- )' }
     ];
     this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords, false);
     
