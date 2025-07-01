@@ -246,20 +246,21 @@ async executeCode() {
             
             // カスタムワードを更新（説明と保護状態付き）
 const customWordsInfo = window.ajisaiInterpreter.get_custom_words_info();
-console.log('Custom words info:', customWordsInfo); // デバッグログ
+console.log('Custom words info:', customWordsInfo);
+console.log('First word data:', customWordsInfo[0]); // 最初の要素を詳しく見る
 
 const customWordInfos = customWordsInfo.map(wordData => {
     // wordDataが配列の場合: [名前, 説明, 保護状態]
     if (Array.isArray(wordData)) {
+        console.log('Word data array:', wordData); // 配列の中身を表示
         const info = {
             name: wordData[0],
             description: wordData[1] || null,
             protected: wordData[2] || false
         };
-        console.log('Word info:', info); // デバッグログ
+        console.log('Processed info:', info);
         return info;
     } else {
-        // 後方互換性のため
         return wordData;
     }
 });
