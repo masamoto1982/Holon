@@ -110,8 +110,10 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
                 "true" => tokens.push(Token::Boolean(true)),
                 "false" => tokens.push(Token::Boolean(false)),
                 "NIL" => tokens.push(Token::Nil),
-                _ => tokens.push(Token::Symbol(word)),
-            }
+                _ => {
+                    // シンボルは大文字に正規化
+                    tokens.push(Token::Symbol(word.to_uppercase()))
+                },
         }
     }
     
