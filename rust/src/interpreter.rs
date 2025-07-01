@@ -797,17 +797,18 @@ impl Interpreter {
     
     // DEL命令の実装
     fn op_del(&mut self) -> Result<(), String> {
-        if let Some(val) = self.stack.pop() {
-            match val.val_type {
-                ValueType::String(name) => {
-                    self.delete_word(&name)
-                },
-                _ => Err("Type error: DEL requires a string".to_string()),
-            }
-        } else {
-            Err("Stack underflow".to_string())
+    if let Some(val) = self.stack.pop() {
+        match val.val_type {
+            ValueType::String(name) => {
+                // ワード名を大文字に正規化
+                self.delete_word(&name.to_uppercase())
+            },
+            _ => Err("Type error: DEL requires a string".to_string()),
         }
+    } else {
+        Err("Stack underflow".to_string())
     }
+}
     
     // Public methods for WASM interface
     pub fn get_stack(&self) -> &Stack {
