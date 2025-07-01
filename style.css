@@ -172,7 +172,6 @@ button:hover {
 }
 
 /* ワードボタン */
-/* ワードボタン */
 .word-button {
     margin: 2px;
     padding: 0.4rem 0.8rem;
@@ -189,23 +188,13 @@ button:hover {
 }
 
 /* 組み込みワード（削除・上書き不可） */
-.word-button.builtin {
+.word-button.builtin,.word-button.protected {
     border-color: #dc3545;  /* 赤色の縁取り */
     background-color: #fff5f5;
 }
 
 .word-button.builtin:hover {
     background-color: #ffe0e0;
-}
-
-/* 依存されているカスタムワード（削除・上書き不可） */
-.word-button.protected {
-    border-color: #fd7e14;  /* オレンジ色の縁取り */
-    background-color: #fff8f0;
-}
-
-.word-button.protected:hover {
-    background-color: #ffead0;
 }
 
 /* 通常のカスタムワード（削除・上書き可能） */
