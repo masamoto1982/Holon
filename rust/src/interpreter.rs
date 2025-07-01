@@ -650,8 +650,11 @@ impl Interpreter {
     
     match (&name_val.val_type, &body_val.val_type) {
         (ValueType::String(name), ValueType::Vector(body)) => {
+            // ワード名を大文字に正規化
+            let name = name.to_uppercase();
+            
             // 組み込みワードの再定義を防ぐ
-            if let Some(existing) = self.dictionary.get(name) {
+            if let Some(existing) = self.dictionary.get(&name) {
                 if existing.is_builtin {
                     return Err(format!("Cannot redefine builtin word: {}", name));
                 }
