@@ -1,4 +1,5 @@
 use std::fmt;
+use crate::tokenizer::Token;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -13,12 +14,41 @@ pub enum ValueType {
     Symbol(String),
     Vector(Vec<Value>),
     Nil,
+    Lazy(LazyValue),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Fraction {
     pub numerator: i64,
     pub denominator: i64,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LazyValue {
+    pub tokens: Vec<Token>,
+    pub environment: Option<Vec<Value>>,
+    pub is_evaluated: bool,
+    pub cached_result: Option<Box<Value>>,
+}
+
+impl LazyValue {
+    pub fn new(tokens: Vec<Token>) -> Self {
+        LazyValue {
+            tokens,
+            environment: None,
+            is_evaluated: false,
+            cached_result: None,
+        }
+    }
+    
+    pub fn with_environment(tokens: Vec<Token>, env: Vec<Value>) -> Self {
+        LazyValue {
+            tokens,
+            environment: Some(env),
+            is_evaluated: false,
+            cached_result: None,
+        }
+    }
 }
 
 impl Fraction {
@@ -116,6 +146,7 @@ impl fmt::Display for Value {
                 write!(f, " ]")
             },
             ValueType::Nil => write!(f, "nil"),
+            ValueType::Lazy(_) => write!(f, "<lazy>"),
         }
     }
 }
