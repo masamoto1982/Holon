@@ -43,6 +43,15 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     register_builtin(dictionary, "=", "等しい ( a b -- bool )");
     register_builtin(dictionary, "<", "より小さい ( a b -- bool )");
     register_builtin(dictionary, "<=", "以下 ( a b -- bool )");
+    
+    // 遅延評価関連
+    register_builtin(dictionary, "LAZY", "ベクトルを遅延評価に変換 ( vec -- lazy )");
+    register_builtin(dictionary, "FORCE", "遅延評価を強制実行 ( lazy -- value )");
+    register_builtin(dictionary, "DELAY", "遅延評価でワードを定義 ( vec str -- )");
+    register_builtin(dictionary, "TAKE", "遅延リストからN個取得 ( n lazy -- vec )");
+    register_builtin(dictionary, "CYCLE", "ベクトルを無限循環させる ( vec -- lazy )");
+    register_builtin(dictionary, "REPEAT", "値を無限反復させる ( value -- lazy )");
+    register_builtin(dictionary, "RANGE", "範囲の遅延生成 ( start end -- lazy )");
 }
 
 fn register_builtin(dictionary: &mut HashMap<String, WordDefinition>, name: &str, description: &str) {
