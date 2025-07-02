@@ -1,4 +1,6 @@
 use std::fmt;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -11,8 +13,28 @@ pub enum ValueType {
     String(String),
     Boolean(bool),
     Symbol(String),
-    Vector(Vec<Value>),  // シンプルに即値評価のベクトルに戻す
+    Vector(Vec<Value>),
     Nil,
+    Thunk(Rc<RefCell<Thunk>>),  // 遅延評価のためのサンク
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Thunk {
+    pub computation: ThunkComputation,
+    pub forced: bool,
+    pub result: Option<Value>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ThunkComputation {
+    // 遅延評価される計算
+    Literal(Value),
+    Symbol(String),
+    Vector(Vec<Value>),
+    Application {
+        function: String,
+        args: Vec<Value>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -116,9 +138,29 @@ impl fmt::Display for Value {
                 write!(f, " ]")
             },
             ValueType::Nil => write!(f, "nil"),
+            ValueType::Thunk(_) => write!(f, "<thunk>"),
         }
     }
 }
 
 pub type Stack = Vec<Value>;
 pub type Register = Option<Value>;
+
+// サンクを作成するヘルパー関数
+impl Thunk {
+    pub fn new(computation: ThunkComputation) -> Rc<RefCell<Self>> {
+        Rc::new(RefCell::new(Thunk {
+            computation,
+            forced: false,
+            result: None,
+        }))
+    }
+}
+
+impl Value {
+    pub fn thunk(computation: ThunkComputation) -> Self {
+        Value {
+            val_type: ValueType::Thunk(Thunk::new(computation)),
+        }
+    }
+}
