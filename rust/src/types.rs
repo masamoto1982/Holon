@@ -1,5 +1,4 @@
 use std::fmt;
-use crate::tokenizer::Token;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Value {
@@ -8,17 +7,12 @@ pub struct Value {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueType {
-    // 即値（遅延評価しない基本型）
     Number(Fraction),
     String(String),
     Boolean(bool),
+    Symbol(String),
+    Vector(Vec<Value>),  // シンプルに即値評価のベクトルに戻す
     Nil,
-    
-    // 遅延評価される型
-    Symbol(String),        // シンボルも遅延評価
-    Vector(LazyVector),    // ベクトルは常に遅延評価
-    Thunk(Thunk),          // 計算サンク
-    Application(Box<Value>, Vec<Value>), // 関数適用も遅延
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -27,94 +21,6 @@ pub struct Fraction {
     pub denominator: i64,
 }
 
-// 遅延評価されるベクトル
-#[derive(Debug, Clone, PartialEq)]
-pub struct LazyVector {
-    pub elements: Vec<Thunk>,
-    pub is_infinite: bool,
-    pub generator: Option<Box<Thunk>>, // 無限リスト用のジェネレータ
-}
-
-// 計算サンク（未評価の計算）
-#[derive(Debug, Clone, PartialEq)]
-pub struct Thunk {
-    pub computation: Computation,
-    pub environment: Option<Vec<Value>>,
-    pub is_evaluated: bool,
-    pub cached_result: Option<Box<Value>>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Computation {
-    // 基本的な計算
-    Literal(Value),                    // リテラル値
-    TokenSequence(Vec<Token>),         // トークン列の実行
-    BuiltinOp(String, Vec<Thunk>),     // 組み込み演算
-    
-    // 遅延ベクトル操作
-    VectorConstruction(Vec<Thunk>),    // ベクトル構築
-    VectorAccess(Box<Thunk>, Box<Thunk>), // インデックスアクセス
-    
-    // 制御フロー
-    Conditional(Box<Thunk>, Box<Thunk>, Box<Thunk>), // 条件分岐
-    
-    // 無限構造
-    InfiniteRange(i64, i64),           // 無限範囲
-    InfiniteCycle(Vec<Value>),         // 無限循環
-    InfiniteRepeat(Box<Value>),        // 無限反復
-}
-
-impl Thunk {
-    pub fn new(computation: Computation) -> Self {
-        Thunk {
-            computation,
-            environment: None,
-            is_evaluated: false,
-            cached_result: None,
-        }
-    }
-    
-    pub fn with_environment(computation: Computation, env: Vec<Value>) -> Self {
-        Thunk {
-            computation,
-            environment: Some(env),
-            is_evaluated: false,
-            cached_result: None,
-        }
-    }
-    
-    pub fn literal(value: Value) -> Self {
-        Thunk::new(Computation::Literal(value))
-    }
-}
-
-impl LazyVector {
-    pub fn new(elements: Vec<Thunk>) -> Self {
-        LazyVector {
-            elements,
-            is_infinite: false,
-            generator: None,
-        }
-    }
-    
-    pub fn infinite_range(start: i64, end: i64) -> Self {
-        LazyVector {
-            elements: Vec::new(),
-            is_infinite: true,
-            generator: Some(Box::new(Thunk::new(Computation::InfiniteRange(start, end)))),
-        }
-    }
-    
-    pub fn infinite_cycle(pattern: Vec<Value>) -> Self {
-        LazyVector {
-            elements: Vec::new(),
-            is_infinite: true,
-            generator: Some(Box::new(Thunk::new(Computation::InfiniteCycle(pattern)))),
-        }
-    }
-}
-
-// 残りのFractionの実装は同じ...
 impl Fraction {
     pub fn new(numerator: i64, denominator: i64) -> Self {
         if denominator == 0 {
@@ -201,10 +107,15 @@ impl fmt::Display for Value {
             ValueType::String(s) => write!(f, "\"{}\"", s),
             ValueType::Boolean(b) => write!(f, "{}", b),
             ValueType::Symbol(s) => write!(f, "{}", s),
-            ValueType::Vector(_) => write!(f, "<lazy-vector>"),
+            ValueType::Vector(v) => {
+                write!(f, "[ ")?;
+                for (i, item) in v.iter().enumerate() {
+                    if i > 0 { write!(f, " ")?; }
+                    write!(f, "{}", item)?;
+                }
+                write!(f, " ]")
+            },
             ValueType::Nil => write!(f, "nil"),
-            ValueType::Thunk(_) => write!(f, "<thunk>"),
-            ValueType::Application(_, _) => write!(f, "<application>"),
         }
     }
 }
