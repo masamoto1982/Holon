@@ -27,11 +27,11 @@ pub struct Thunk {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ThunkComputation {
+    // 遅延評価される計算
     Literal(Value),
     Symbol(String),
     Vector(Vec<Value>),
-    // Tokensの代わりにVectorを使う（実行時に解釈）
-    Expression(Vec<Value>),  // ベクトルとして保存
+    Expression(Vec<Value>),  // ベクトルを式として評価
     Application {
         function: String,
         args: Vec<Value>,
