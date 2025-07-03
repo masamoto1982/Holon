@@ -208,68 +208,82 @@ impl Interpreter {
        }
    }
    
-   // サンクを強制評価
-   pub fn force_value(&mut self, value: &Value) -> Result<Value, String> {
-       match &value.val_type {
-           ValueType::Thunk(thunk_ref) => {
-               let thunk = thunk_ref.borrow_mut();
-               
-               // 既に評価済みなら結果を返す
-               if thunk.forced {
-                   return Ok(thunk.result.as_ref().unwrap().clone());
-               }
-               
-               // 計算を実行
-               let computation = thunk.computation.clone();
-               drop(thunk); // borrow_mutを解放
-               
-               let result = match computation {
-                   ThunkComputation::Literal(v) => Ok(v),
-                   ThunkComputation::Symbol(name) => {
-                       // シンボルを評価
-                       self.execute_symbol(&name)
-                   },
-                   ThunkComputation::Vector(elements) => {
-                       // ベクトルの各要素を評価
-                       let mut evaluated = Vec::new();
-                       for elem in elements {
-                           let val = self.force_value(&elem)?;
-                           evaluated.push(val);
-                       }
-                       Ok(Value {
-                           val_type: ValueType::Vector(evaluated),
-                       })
-                   },
-                   ThunkComputation::Application { function, args } => {
-                       // 引数をスタックに積む
-                       for arg in args {
-                           self.stack.push(arg);
-                       }
-                       
-                       // 関数を実行
-                       self.execute_symbol(&function)?;
-                       
-                       // 結果を取得
-                       if let Some(result) = self.stack.pop() {
-                           Ok(result)
-                       } else {
-                           Err("Function produced no result".to_string())
-                       }
-                   },
-               };
-               
-               // 結果を保存
-               if let Ok(ref res) = result {
-                   let mut thunk = thunk_ref.borrow_mut();
-                   thunk.forced = true;
-                   thunk.result = Some(res.clone());
-               }
-               
-               result
-           },
-           _ => Ok(value.clone()), // サンクでなければそのまま返す
-       }
-   }
+   // force_valueメソッドも修正
+pub fn force_value(&mut self, value: &Value) -> Result<Value, String> {
+    match &value.val_type {
+        ValueType::Thunk(thunk_ref) => {
+            let thunk = thunk_ref.borrow_mut();
+            
+            // 既に評価済みなら結果を返す
+            if thunk.forced {
+                return Ok(thunk.result.as_ref().unwrap().clone());
+            }
+            
+            // 計算を実行
+            let computation = thunk.computation.clone();
+            drop(thunk); // borrow_mutを解放
+            
+            let result = match computation {
+                ThunkComputation::Literal(v) => Ok(v),
+                ThunkComputation::Symbol(name) => {
+                    // シンボルを評価
+                    self.execute_symbol(&name)
+                },
+                ThunkComputation::Vector(elements) => {
+                    // ベクトルの各要素を評価
+                    let mut evaluated = Vec::new();
+                    for elem in elements {
+                        let val = self.force_value(&elem)?;
+                        evaluated.push(val);
+                    }
+                    Ok(Value {
+                        val_type: ValueType::Vector(evaluated),
+                    })
+                },
+                ThunkComputation::Tokens(tokens) => {
+                    // トークン列を実行
+                    let saved_stack_len = self.stack.len();
+                    self.execute_tokens_with_context(&tokens, false)?;
+                    
+                    // 実行結果をスタックから取得
+                    if self.stack.len() > saved_stack_len {
+                        // 新しい値がスタックに積まれた
+                        Ok(self.stack.pop().unwrap())
+                    } else {
+                        // 何も積まれなかった場合はnil
+                        Ok(Value { val_type: ValueType::Nil })
+                    }
+                },
+                ThunkComputation::Application { function, args } => {
+                    // 引数をスタックに積む
+                    for arg in args {
+                        self.stack.push(arg);
+                    }
+                    
+                    // 関数を実行
+                    self.execute_symbol(&function)?;
+                    
+                    // 結果を取得
+                    if let Some(result) = self.stack.pop() {
+                        Ok(result)
+                    } else {
+                        Err("Function produced no result".to_string())
+                    }
+                },
+            };
+            
+            // 結果を保存
+            if let Ok(ref res) = result {
+                let mut thunk = thunk_ref.borrow_mut();
+                thunk.forced = true;
+                thunk.result = Some(res.clone());
+            }
+            
+            result
+        },
+        _ => Ok(value.clone()), // サンクでなければそのまま返す
+    }
+}
    
    // シンボルを実行
    fn execute_symbol(&mut self, name: &str) -> Result<Value, String> {
