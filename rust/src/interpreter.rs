@@ -961,6 +961,201 @@ impl Interpreter {
            _ => Err("Type error: IF requires a boolean and two vectors".to_string()),
        }
    }
+
+    // ベクトルを再帰的にトークンに変換
+    fn value_to_tokens(&self, value: &Value) -> Result<Vec<Token>, String> {
+        match &value.val_type {
+            ValueType::Number(n) => {
+                Ok(vec![Token::Number(n.numerator, n.denominator)])
+            },
+            ValueType::String(s) => {
+                Ok(vec![Token::String(s.clone())])
+            },
+            ValueType::Boolean(b) => {
+                Ok(vec![Token::Boolean(*b)])
+            },
+            ValueType::Symbol(s) => {
+                Ok(vec![Token::Symbol(s.clone())])
+            },
+            ValueType::Nil => {
+                Ok(vec![Token::Nil])
+            },
+            ValueType::Vector(v) => {
+                let mut tokens = vec![Token::VectorStart];
+                for elem in v {
+                    let elem_tokens = self.value_to_tokens(elem)?;
+                    tokens.extend(elem_tokens);
+                }
+                tokens.push(Token::VectorEnd);
+                Ok(tokens)
+            },
+            ValueType::Thunk(_) => {
+                Err("Cannot convert thunk to tokens".to_string())
+            }
+        }
+    }
+
+    // op_defを修正してネストされたベクトルに対応
+    fn op_def_with_comment(&mut self, description: Option<String>) -> Result<(), String> {
+        if self.stack.len() < 2 {
+            return Err("Stack underflow for DEF".to_string());
+        }
+        
+        let name_val = self.stack.pop().unwrap();
+        let body_val = self.stack.pop().unwrap();
+        
+        match (&name_val.val_type, &body_val.val_type) {
+            (ValueType::String(name), ValueType::Vector(body)) => {
+                // ワード名を大文字に正規化
+                let name = name.to_uppercase();
+                
+                // 組み込みワードの再定義を防ぐ
+                if let Some(existing) = self.dictionary.get(&name) {
+                    if existing.is_builtin {
+                        return Err(format!("Cannot redefine builtin word: {}", name));
+                    }
+                }
+                
+                // 既存のカスタムワードを再定義する場合、依存関係をチェック
+                if self.dictionary.contains_key(&name) {
+                    if let Some(dependents) = self.dependencies.get(&name) {
+                        if !dependents.is_empty() {
+                            let dependent_list: Vec<String> = dependents.iter().cloned().collect();
+                            return Err(format!(
+                                "Cannot redefine '{}' because it is used by: {}", 
+                                name, 
+                                dependent_list.join(", ")
+                            ));
+                        }
+                    }
+                    // 依存関係がなければ、古い定義の依存関係を削除
+                    let old_def = self.dictionary.get(&name).unwrap();
+                    let old_deps = Self::collect_dependencies(&old_def.tokens);
+                    for dep in old_deps {
+                        if let Some(deps) = self.dependencies.get_mut(&dep) {
+                            deps.remove(&name);
+                        }
+                    }
+                }
+                
+                // ベクトルの内容を再帰的にトークンに変換
+                let mut tokens = Vec::new();
+                let mut used_words = HashSet::new();
+                
+                for val in body {
+                    let val_tokens = self.value_to_tokens(val)?;
+                    
+                    // 使用されているカスタムワードを収集
+                    for token in &val_tokens {
+                        if let Token::Symbol(s) = token {
+                            if self.dictionary.contains_key(s) && !self.dictionary.get(s).unwrap().is_builtin {
+                                used_words.insert(s.clone());
+                            }
+                        }
+                    }
+                    
+                    tokens.extend(val_tokens);
+                }
+                
+                // 新しい依存関係を追加
+                for used_word in &used_words {
+                    self.dependencies
+                        .entry(used_word.clone())
+                        .or_insert_with(HashSet::new)
+                        .insert(name.clone());
+                }
+                
+                // ワードを定義（新規または上書き）
+                self.dictionary.insert(name.clone(), WordDefinition {
+                    tokens,
+                    is_builtin: false,
+                    description,
+                });
+                
+                Ok(())
+            },
+            _ => Err("Type error: DEF requires a vector and a string".to_string()),
+        }
+    }
+
+    // op_recも同様に修正
+    fn op_rec(&mut self) -> Result<(), String> {
+        if self.stack.len() < 2 {
+            return Err("Stack underflow for REC".to_string());
+        }
+        
+        let name_val = self.stack.pop().unwrap();
+        let body_val = self.stack.pop().unwrap();
+        
+        match (&name_val.val_type, &body_val.val_type) {
+            (ValueType::String(name), ValueType::Vector(body)) => {
+                let name = name.to_uppercase();
+                
+                // 組み込みワードの再定義を防ぐ
+                if let Some(existing) = self.dictionary.get(&name) {
+                    if existing.is_builtin {
+                        return Err(format!("Cannot redefine builtin word: {}", name));
+                    }
+                }
+                
+                // ベクトルの内容を再帰的にトークンに変換（自己参照をDEFERでラップ）
+                let mut tokens = Vec::new();
+                
+                for val in body {
+                    let mut val_tokens = self.value_to_tokens(val)?;
+                    
+                    // 自己参照をDEFERでラップ
+                    let mut i = 0;
+                    while i < val_tokens.len() {
+                        if let Token::Symbol(s) = &val_tokens[i] {
+                            if s == &name {
+                                // 自己参照の後にDEFERを挿入
+                                val_tokens.insert(i + 1, Token::Symbol("DEFER".to_string()));
+                                i += 1; // DEFERの分スキップ
+                            }
+                        }
+                        i += 1;
+                    }
+                    
+                    tokens.extend(val_tokens);
+                }
+                
+                // ワードを定義
+                self.dictionary.insert(name.clone(), WordDefinition {
+                    tokens,
+                    is_builtin: false,
+                    description: None,
+                });
+                
+                Ok(())
+            },
+            _ => Err("Type error: REC requires a vector and a string".to_string()),
+        }
+    }
+
+    // op_ifも修正してネストされたベクトルの実行に対応
+    fn op_if(&mut self) -> Result<(), String> {
+        if self.stack.len() < 3 {
+            return Err("Stack underflow for IF".to_string());
+        }
+        
+        let else_branch = self.stack.pop().unwrap();
+        let then_branch = self.stack.pop().unwrap();
+        let condition = self.stack.pop().unwrap();
+        
+        match (&condition.val_type, &then_branch.val_type, &else_branch.val_type) {
+            (ValueType::Boolean(cond), ValueType::Vector(then_tokens), ValueType::Vector(else_tokens)) => {
+                let branch = if *cond { then_branch } else { else_branch };
+                
+                // 選択されたブランチをトークンに変換して実行
+                let tokens = self.value_to_tokens(&branch)?;
+                self.execute_tokens_with_context(&tokens, false)?;
+                
+                Ok(())
+            },
+            _ => Err("Type error: IF requires a boolean and two vectors".to_string()),
+        }
+    }
    
    // 辞書操作
    fn op_words(&mut self) -> Result<(), String> {
