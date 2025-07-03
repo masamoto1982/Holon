@@ -1,539 +1,538 @@
 use std::collections::{HashMap, HashSet};
-use std::rc::Rc;
-use std::cell::RefCell;
 use crate::types::*;
 use crate::tokenizer::*;
 use crate::builtins;
 
 pub struct Interpreter {
-   stack: Stack,
-   register: Register,
-   dictionary: HashMap<String, WordDefinition>,
-   dependencies: HashMap<String, HashSet<String>>, // word -> それを使用しているワードのセット
+    stack: Stack,
+    register: Register,
+    dictionary: HashMap<String, WordDefinition>,
+    dependencies: HashMap<String, HashSet<String>>, // word -> それを使用しているワードのセット
 }
 
+#[derive(Clone)]
 pub struct WordDefinition {
-   pub tokens: Vec<Token>,
-   pub is_builtin: bool,
-   pub description: Option<String>,
+    pub tokens: Vec<Token>,
+    pub is_builtin: bool,
+    pub description: Option<String>,
 }
 
 impl Interpreter {
-   pub fn new() -> Self {
-       let mut interpreter = Interpreter {
-           stack: Vec::new(),
-           register: None,
-           dictionary: HashMap::new(),
-           dependencies: HashMap::new(),
-       };
-       
-       // 組み込みワードを登録
-       builtins::register_builtins(&mut interpreter.dictionary);
-       
-       interpreter
-   }
-   
-   pub fn execute(&mut self, code: &str) -> Result<(), String> {
-       let tokens = tokenize(code)?;
-       self.execute_tokens_with_context(&tokens, false)?;
-       Ok(())
-   }
-   
-   pub fn execute_tokens(&mut self, tokens: &[Token]) -> Result<(), String> {
-       self.execute_tokens_with_context(tokens, false)
-   }
-   
-   fn execute_tokens_with_context(&mut self, tokens: &[Token], in_vector: bool) -> Result<(), String> {
-       let mut i = 0;
-       let mut pending_description: Option<String> = None;
-       
-       while i < tokens.len() {
-           match &tokens[i] {
-               Token::Description(text) => {
-                   // DEFの後の説明文として保持
-                   pending_description = Some(text.clone());
-               },
-               Token::Number(num, den) => {
-                   self.stack.push(Value {
-                       val_type: ValueType::Number(Fraction::new(*num, *den)),
-                   });
-               },
-               Token::String(s) => {
-                   self.stack.push(Value {
-                       val_type: ValueType::String(s.clone()),
-                   });
-               },
-               Token::Boolean(b) => {
-                   self.stack.push(Value {
-                       val_type: ValueType::Boolean(*b),
-                   });
-               },
-               Token::Nil => {
-                   self.stack.push(Value {
-                       val_type: ValueType::Nil,
-                   });
-               },
-               Token::VectorStart => {
-                   let (vector_tokens, consumed) = self.collect_vector(&tokens[i..])?;
-                   let saved_stack = self.stack.clone();
-                   self.stack.clear();
-                   
-                   self.execute_tokens_with_context(&vector_tokens, true)?;
-                   
-                   let vector_contents = self.stack.clone();
-                   self.stack = saved_stack;
-                   
-                   self.stack.push(Value {
-                       val_type: ValueType::Vector(vector_contents),
-                   });
-                   
-                   i += consumed - 1;
-               },
-               Token::Symbol(name) => {
-                   if in_vector {
-                       // ベクトル内ではシンボルとしてスタックに積む
-                       self.stack.push(Value {
-                           val_type: ValueType::Symbol(name.clone()),
-                       });
-                   } else {
-                       // 通常のコンテキストでは実行
-                       if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
-                           self.execute_operator(name)?;
-                       } else if let Some(def) = self.dictionary.get(name) {
-                           if def.is_builtin {
-                               if name == "DEF" {
-                                   // DEFの場合、次のトークンが説明文かチェック
-                                   let mut description = None;
-                                   if i + 1 < tokens.len() {
-                                       if let Token::Description(text) = &tokens[i + 1] {
-                                           description = Some(text.clone());
-                                           i += 1; // 説明文トークンをスキップ
-                                       }
-                                   }
-                                   // pending_descriptionがあればそれを優先
-                                   if pending_description.is_some() {
-                                       description = pending_description.take();
-                                   }
-                                   self.execute_builtin_with_comment(name, description)?;
-                               } else {
-                                   self.execute_builtin(name)?;
-                               }
-                           } else {
-                               self.execute_tokens_with_context(&def.tokens.clone(), false)?;
-                           }
-                       } else {
-                           return Err(format!("Unknown word: {}", name));
-                       }
-                   }
-               },
-               _ => {
-                   return Err(format!("Unexpected token: {:?}", tokens[i]));
-               }
-           }
-           
-           // Descriptionトークンとそれを使用したDEF以外で説明文をクリア
-           if !matches!(&tokens[i], Token::Description(_)) {
-               if let Token::Symbol(s) = &tokens[i] {
-                   if s != "DEF" || i == 0 || !matches!(&tokens[i-1], Token::Description(_)) {
-                       pending_description = None;
-                   }
-               } else {
-                   pending_description = None;
-               }
-           }
-           
-           i += 1;
-       }
-       
-       Ok(())
-   }
-   
-   fn collect_vector(&self, tokens: &[Token]) -> Result<(Vec<Token>, usize), String> {
-       let mut vector_tokens = Vec::new();
-       let mut depth = 0;
-       let mut i = 1; // Skip the opening [
-       
-       while i < tokens.len() {
-           match &tokens[i] {
-               Token::VectorStart => {
-                   depth += 1;
-                   vector_tokens.push(tokens[i].clone());
-               },
-               Token::VectorEnd => {
-                   if depth == 0 {
-                       return Ok((vector_tokens, i + 1));
-                   }
-                   depth -= 1;
-                   vector_tokens.push(tokens[i].clone());
-               },
-               _ => {
-                   vector_tokens.push(tokens[i].clone());
-               }
-           }
-           i += 1;
-       }
-       
-       Err("Unclosed vector".to_string())
-   }
-   
-   // サンクを強制評価
-   pub fn force_value(&mut self, value: &Value) -> Result<Value, String> {
-       match &value.val_type {
-           ValueType::Thunk(thunk_ref) => {
-               let mut thunk = thunk_ref.borrow_mut();
-               
-               // 既に評価済みなら結果を返す
-               if thunk.forced {
-                   return Ok(thunk.result.as_ref().unwrap().clone());
-               }
-               
-               // 計算を実行
-               let computation = thunk.computation.clone();
-               drop(thunk); // borrow_mutを解放
-               
-               let result = match computation {
-                   ThunkComputation::Literal(v) => Ok(v),
-                   ThunkComputation::Symbol(name) => {
-                       // シンボルを評価
-                       self.execute_symbol(&name)
-                   },
-                   ThunkComputation::Vector(elements) => {
-                       // ベクトルの各要素を評価
-                       let mut evaluated = Vec::new();
-                       for elem in elements {
-                           let val = self.force_value(&elem)?;
-                           evaluated.push(val);
-                       }
-                       Ok(Value {
-                           val_type: ValueType::Vector(evaluated),
-                       })
-                   },
-                   ThunkComputation::Application { function, args } => {
-                       // 引数をスタックに積む
-                       for arg in args {
-                           self.stack.push(arg);
-                       }
-                       
-                       // 関数を実行
-                       self.execute_symbol(&function)?;
-                       
-                       // 結果を取得
-                       if let Some(result) = self.stack.pop() {
-                           Ok(result)
-                       } else {
-                           Err("Function produced no result".to_string())
-                       }
-                   },
-               };
-               
-               // 結果を保存
-               if let Ok(ref res) = result {
-                   let mut thunk = thunk_ref.borrow_mut();
-                   thunk.forced = true;
-                   thunk.result = Some(res.clone());
-               }
-               
-               result
-           },
-           _ => Ok(value.clone()), // サンクでなければそのまま返す
-       }
-   }
-   
-   // シンボルを実行
-   fn execute_symbol(&mut self, name: &str) -> Result<Value, String> {
-       if matches!(name, "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
-           self.execute_operator(name)?;
-       } else if let Some(def) = self.dictionary.get(name).cloned() {
-           if def.is_builtin {
-               self.execute_builtin(name)?;
-           } else {
-               self.execute_tokens_with_context(&def.tokens, false)?;
-           }
-       } else {
-           return Err(format!("Unknown word: {}", name));
-       }
-       
-       // スタックトップの値を返す
-       self.stack.last().cloned().ok_or_else(|| "No result".to_string())
-   }
-   
-   fn execute_builtin(&mut self, name: &str) -> Result<(), String> {
-       match name {
-           "DUP" => self.op_dup()?,
-           "DROP" => self.op_drop()?,
-           "SWAP" => self.op_swap()?,
-           "OVER" => self.op_over()?,
-           "ROT" => self.op_rot()?,
-           ">R" => self.op_to_r()?,
-           "R>" => self.op_from_r()?,
-           "R@" => self.op_r_fetch()?,
-           "DEF" => self.op_def()?,
-           "IF" => self.op_if()?,
-           "LENGTH" => self.op_length()?,
-           "HEAD" => self.op_head()?,
-           "TAIL" => self.op_tail()?,
-           "CONS" => self.op_cons()?,
-           "REVERSE" => self.op_reverse()?,
-           "NTH" => self.op_nth()?,
-           "WORDS" => self.op_words()?,
-           "WORDS?" => self.op_words_filter()?,
-           "DEL" => self.op_del()?,
-           "DEFER" => self.op_defer()?,
-           "FORCE" => self.op_force()?,
-           "REC" => self.op_rec()?,
-           _ => return Err(format!("Unknown builtin: {}", name)),
-       }
-       Ok(())
-   }
-   
-   fn execute_builtin_with_comment(&mut self, name: &str, comment: Option<String>) -> Result<(), String> {
-       match name {
-           "DEF" => self.op_def_with_comment(comment)?,
-           _ => self.execute_builtin(name)?,
-       }
-       Ok(())
-   }
-   
-   fn execute_operator(&mut self, op: &str) -> Result<(), String> {
-       match op {
-           "+" => self.op_add()?,
-           "-" => self.op_sub()?,
-           "*" => self.op_mul()?,
-           "/" => self.op_div()?,
-           ">" => self.op_gt()?,
-           ">=" => self.op_ge()?,
-           "=" => self.op_eq()?,
-           "<" => self.op_lt()?,
-           "<=" => self.op_le()?,
-           _ => return Err(format!("Unknown operator: {}", op)),
-       }
-       Ok(())
-   }
-   
-   // ワードの依存関係を収集
-   fn collect_dependencies(tokens: &[Token]) -> HashSet<String> {
-       let mut deps = HashSet::new();
-       for token in tokens {
-           if let Token::Symbol(name) = token {
-               deps.insert(name.clone());
-           }
-       }
-       deps
-   }
-   
-   // ワードの削除（DEL命令用）
-   pub fn delete_word(&mut self, name: &str) -> Result<(), String> {
-       // 組み込みワードは削除不可
-       if let Some(def) = self.dictionary.get(name) {
-           if def.is_builtin {
-               return Err(format!("Cannot delete builtin word: {}", name));
-           }
-       } else {
-           return Err(format!("Word not found: {}", name));
-       }
-       
-       // 依存関係チェック
-       if let Some(dependents) = self.dependencies.get(name) {
-           if !dependents.is_empty() {
-               let dependent_list: Vec<String> = dependents.iter().cloned().collect();
-               return Err(format!(
-                   "Cannot delete '{}' because it is used by: {}", 
-                   name, 
-                   dependent_list.join(", ")
-               ));
-           }
-       }
-       
-       // ワードを削除
-       self.dictionary.remove(name);
-       
-       // このワードが依存していた他のワードから、依存関係を削除
-       for (_, deps) in self.dependencies.iter_mut() {
-           deps.remove(name);
-       }
-       
-       // 依存関係エントリ自体も削除
-       self.dependencies.remove(name);
-       
-       Ok(())
-   }
-   
-   // スタック操作
-   fn op_dup(&mut self) -> Result<(), String> {
-       if let Some(top) = self.stack.last() {
-           self.stack.push(top.clone());
-           Ok(())
-       } else {
-           Err("Stack underflow".to_string())
-       }
-   }
-   
-   fn op_drop(&mut self) -> Result<(), String> {
-       if self.stack.pop().is_none() {
-           Err("Stack underflow".to_string())
-       } else {
-           Ok(())
-       }
-   }
-   
-   fn op_swap(&mut self) -> Result<(), String> {
-       let len = self.stack.len();
-       if len < 2 {
-           Err("Stack underflow".to_string())
-       } else {
-           self.stack.swap(len - 1, len - 2);
-           Ok(())
-       }
-   }
-   
-   fn op_over(&mut self) -> Result<(), String> {
-       let len = self.stack.len();
-       if len < 2 {
-           Err("Stack underflow".to_string())
-       } else {
-           let item = self.stack[len - 2].clone();
-           self.stack.push(item);
-           Ok(())
-       }
-   }
-   
-   fn op_rot(&mut self) -> Result<(), String> {
-       let len = self.stack.len();
-       if len < 3 {
-           Err("Stack underflow".to_string())
-       } else {
-           let third = self.stack.remove(len - 3);
-           self.stack.push(third);
-           Ok(())
-       }
-   }
-   
-   // レジスタ操作
-   fn op_to_r(&mut self) -> Result<(), String> {
-       if let Some(val) = self.stack.pop() {
-           self.register = Some(val);
-           Ok(())
-       } else {
-           Err("Stack underflow".to_string())
-       }
-   }
-   
-   fn op_from_r(&mut self) -> Result<(), String> {
-       if let Some(val) = self.register.take() {
-           self.stack.push(val);
-           Ok(())
-       } else {
-           Err("Register is empty".to_string())
-       }
-   }
-   
-   fn op_r_fetch(&mut self) -> Result<(), String> {
-       if let Some(val) = &self.register {
-           self.stack.push(val.clone());
-           Ok(())
-       } else {
-           Err("Register is empty".to_string())
-       }
-   }
-   
-   // 遅延評価操作
-   fn op_defer(&mut self) -> Result<(), String> {
-       if let Some(val) = self.stack.pop() {
-           match val.val_type {
-               ValueType::Symbol(name) => {
-                   let thunk = Value::thunk(ThunkComputation::Symbol(name));
-                   self.stack.push(thunk);
-                   Ok(())
-               },
-               ValueType::Vector(vec) => {
-                   let thunk = Value::thunk(ThunkComputation::Vector(vec));
-                   self.stack.push(thunk);
-                   Ok(())
-               },
-               _ => Err("DEFER requires a symbol or vector".to_string()),
-           }
-       } else {
-           Err("Stack underflow".to_string())
-       }
-   }
-   
-   fn op_force(&mut self) -> Result<(), String> {
-       if let Some(val) = self.stack.pop() {
-           let forced = self.force_value(&val)?;
-           self.stack.push(forced);
-           Ok(())
-       } else {
-           Err("Stack underflow".to_string())
-       }
-   }
-   
-   // 再帰的定義
-   fn op_rec(&mut self) -> Result<(), String> {
-       if self.stack.len() < 2 {
-           return Err("Stack underflow for REC".to_string());
-       }
-       
-       let name_val = self.stack.pop().unwrap();
-       let body_val = self.stack.pop().unwrap();
-       
-       match (&name_val.val_type, &body_val.val_type) {
-           (ValueType::String(name), ValueType::Vector(body)) => {
-               let name = name.to_uppercase();
-               
-               // 組み込みワードの再定義を防ぐ
-               if let Some(existing) = self.dictionary.get(&name) {
-                   if existing.is_builtin {
-                       return Err(format!("Cannot redefine builtin word: {}", name));
-                   }
-               }
-               
-               // ベクトルの内容をトークンに変換（自己参照をDEFERでラップ）
-               let mut tokens = Vec::new();
-               
-               for val in body {
-                   match &val.val_type {
-                       ValueType::Number(n) => {
-                           tokens.push(Token::Number(n.numerator, n.denominator));
-                       },
-                       ValueType::String(s) => {
-                           tokens.push(Token::String(s.clone()));
-                       },
-                       ValueType::Boolean(b) => {
-                           tokens.push(Token::Boolean(*b));
-                       },
-                       ValueType::Symbol(s) => {
-                           if s == &name {
-                               // 自己参照をDEFERでラップ
-                               tokens.push(Token::Symbol(s.clone()));
-                               tokens.push(Token::Symbol("DEFER".to_string()));
-                           } else {
-                               tokens.push(Token::Symbol(s.clone()));
-                           }
-                       },
-                       ValueType::Nil => {
-                           tokens.push(Token::Nil);
-                       },
-                       ValueType::Vector(_) => {
-                           return Err("Nested vectors in word definitions are not yet supported".to_string());
-                       },
-                       ValueType::Thunk(_) => {
-                           return Err("Thunks in word definitions are not supported".to_string());
-                       }
-                   }
-               }
-               
-               // ワードを定義
-               self.dictionary.insert(name.clone(), WordDefinition {
-                   tokens,
-                   is_builtin: false,
-                   description: None,
-               });
-               
-               Ok(())
-           },
-           _ => Err("Type error: REC requires a vector and a string".to_string()),
-       }
-   }
+    pub fn new() -> Self {
+        let mut interpreter = Interpreter {
+            stack: Vec::new(),
+            register: None,
+            dictionary: HashMap::new(),
+            dependencies: HashMap::new(),
+        };
+        
+        // 組み込みワードを登録
+        builtins::register_builtins(&mut interpreter.dictionary);
+        
+        interpreter
+    }
+    
+    pub fn execute(&mut self, code: &str) -> Result<(), String> {
+        let tokens = tokenize(code)?;
+        self.execute_tokens_with_context(&tokens, false)?;
+        Ok(())
+    }
+    
+    pub fn execute_tokens(&mut self, tokens: &[Token]) -> Result<(), String> {
+        self.execute_tokens_with_context(tokens, false)
+    }
+    
+    fn execute_tokens_with_context(&mut self, tokens: &[Token], in_vector: bool) -> Result<(), String> {
+        let mut i = 0;
+        let mut pending_description: Option<String> = None;
+        
+        while i < tokens.len() {
+            match &tokens[i] {
+                Token::Description(text) => {
+                    // DEFの後の説明文として保持
+                    pending_description = Some(text.clone());
+                },
+                Token::Number(num, den) => {
+                    self.stack.push(Value {
+                        val_type: ValueType::Number(Fraction::new(*num, *den)),
+                    });
+                },
+                Token::String(s) => {
+                    self.stack.push(Value {
+                        val_type: ValueType::String(s.clone()),
+                    });
+                },
+                Token::Boolean(b) => {
+                    self.stack.push(Value {
+                        val_type: ValueType::Boolean(*b),
+                    });
+                },
+                Token::Nil => {
+                    self.stack.push(Value {
+                        val_type: ValueType::Nil,
+                    });
+                },
+                Token::VectorStart => {
+                    let (vector_tokens, consumed) = self.collect_vector(&tokens[i..])?;
+                    let saved_stack = self.stack.clone();
+                    self.stack.clear();
+                    
+                    self.execute_tokens_with_context(&vector_tokens, true)?;
+                    
+                    let vector_contents = self.stack.clone();
+                    self.stack = saved_stack;
+                    
+                    self.stack.push(Value {
+                        val_type: ValueType::Vector(vector_contents),
+                    });
+                    
+                    i += consumed - 1;
+                },
+                Token::Symbol(name) => {
+                    if in_vector {
+                        // ベクトル内ではシンボルとしてスタックに積む
+                        self.stack.push(Value {
+                            val_type: ValueType::Symbol(name.clone()),
+                        });
+                    } else {
+                        // 通常のコンテキストでは実行
+                        if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
+                            self.execute_operator(name)?;
+                        } else if let Some(def) = self.dictionary.get(name) {
+                            if def.is_builtin {
+                                if name == "DEF" {
+                                    // DEFの場合、次のトークンが説明文かチェック
+                                    let mut description = None;
+                                    if i + 1 < tokens.len() {
+                                        if let Token::Description(text) = &tokens[i + 1] {
+                                            description = Some(text.clone());
+                                            i += 1; // 説明文トークンをスキップ
+                                        }
+                                    }
+                                    // pending_descriptionがあればそれを優先
+                                    if pending_description.is_some() {
+                                        description = pending_description.take();
+                                    }
+                                    self.execute_builtin_with_comment(name, description)?;
+                                } else {
+                                    self.execute_builtin(name)?;
+                                }
+                            } else {
+                                self.execute_tokens_with_context(&def.tokens.clone(), false)?;
+                            }
+                        } else {
+                            return Err(format!("Unknown word: {}", name));
+                        }
+                    }
+                },
+                _ => {
+                    return Err(format!("Unexpected token: {:?}", tokens[i]));
+                }
+            }
+            
+            // Descriptionトークンとそれを使用したDEF以外で説明文をクリア
+            if !matches!(&tokens[i], Token::Description(_)) {
+                if let Token::Symbol(s) = &tokens[i] {
+                    if s != "DEF" || i == 0 || !matches!(&tokens[i-1], Token::Description(_)) {
+                        pending_description = None;
+                    }
+                } else {
+                    pending_description = None;
+                }
+            }
+            
+            i += 1;
+        }
+        
+        Ok(())
+    }
+    
+    fn collect_vector(&self, tokens: &[Token]) -> Result<(Vec<Token>, usize), String> {
+        let mut vector_tokens = Vec::new();
+        let mut depth = 0;
+        let mut i = 1; // Skip the opening [
+        
+        while i < tokens.len() {
+            match &tokens[i] {
+                Token::VectorStart => {
+                    depth += 1;
+                    vector_tokens.push(tokens[i].clone());
+                },
+                Token::VectorEnd => {
+                    if depth == 0 {
+                        return Ok((vector_tokens, i + 1));
+                    }
+                    depth -= 1;
+                    vector_tokens.push(tokens[i].clone());
+                },
+                _ => {
+                    vector_tokens.push(tokens[i].clone());
+                }
+            }
+            i += 1;
+        }
+        
+        Err("Unclosed vector".to_string())
+    }
+    
+    // サンクを強制評価
+    pub fn force_value(&mut self, value: &Value) -> Result<Value, String> {
+        match &value.val_type {
+            ValueType::Thunk(thunk_ref) => {
+                let thunk = thunk_ref.borrow_mut();
+                
+                // 既に評価済みなら結果を返す
+                if thunk.forced {
+                    return Ok(thunk.result.as_ref().unwrap().clone());
+                }
+                
+                // 計算を実行
+                let computation = thunk.computation.clone();
+                drop(thunk); // borrow_mutを解放
+                
+                let result = match computation {
+                    ThunkComputation::Literal(v) => Ok(v),
+                    ThunkComputation::Symbol(name) => {
+                        // シンボルを評価
+                        self.execute_symbol(&name)
+                    },
+                    ThunkComputation::Vector(elements) => {
+                        // ベクトルの各要素を評価
+                        let mut evaluated = Vec::new();
+                        for elem in elements {
+                            let val = self.force_value(&elem)?;
+                            evaluated.push(val);
+                        }
+                        Ok(Value {
+                            val_type: ValueType::Vector(evaluated),
+                        })
+                    },
+                    ThunkComputation::Application { function, args } => {
+                        // 引数をスタックに積む
+                        for arg in args {
+                            self.stack.push(arg);
+                        }
+                        
+                        // 関数を実行
+                        self.execute_symbol(&function)?;
+                        
+                        // 結果を取得
+                        if let Some(result) = self.stack.pop() {
+                            Ok(result)
+                        } else {
+                            Err("Function produced no result".to_string())
+                        }
+                    },
+                };
+                
+                // 結果を保存
+                if let Ok(ref res) = result {
+                    let mut thunk = thunk_ref.borrow_mut();
+                    thunk.forced = true;
+                    thunk.result = Some(res.clone());
+                }
+                
+                result
+            },
+            _ => Ok(value.clone()), // サンクでなければそのまま返す
+        }
+    }
+    
+    // シンボルを実行
+    fn execute_symbol(&mut self, name: &str) -> Result<Value, String> {
+        if matches!(name, "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
+            self.execute_operator(name)?;
+        } else if let Some(def) = self.dictionary.get(name).cloned() {
+            if def.is_builtin {
+                self.execute_builtin(name)?;
+            } else {
+                self.execute_tokens_with_context(&def.tokens, false)?;
+            }
+        } else {
+            return Err(format!("Unknown word: {}", name));
+        }
+        
+        // スタックトップの値を返す
+        self.stack.last().cloned().ok_or_else(|| "No result".to_string())
+    }
+    
+    fn execute_builtin(&mut self, name: &str) -> Result<(), String> {
+        match name {
+            "DUP" => self.op_dup()?,
+            "DROP" => self.op_drop()?,
+            "SWAP" => self.op_swap()?,
+            "OVER" => self.op_over()?,
+            "ROT" => self.op_rot()?,
+            ">R" => self.op_to_r()?,
+            "R>" => self.op_from_r()?,
+            "R@" => self.op_r_fetch()?,
+            "DEF" => self.op_def()?,
+            "IF" => self.op_if()?,
+            "LENGTH" => self.op_length()?,
+            "HEAD" => self.op_head()?,
+            "TAIL" => self.op_tail()?,
+            "CONS" => self.op_cons()?,
+            "REVERSE" => self.op_reverse()?,
+            "NTH" => self.op_nth()?,
+            "WORDS" => self.op_words()?,
+            "WORDS?" => self.op_words_filter()?,
+            "DEL" => self.op_del()?,
+            "DEFER" => self.op_defer()?,
+            "FORCE" => self.op_force()?,
+            "REC" => self.op_rec()?,
+            _ => return Err(format!("Unknown builtin: {}", name)),
+        }
+        Ok(())
+    }
+    
+    fn execute_builtin_with_comment(&mut self, name: &str, comment: Option<String>) -> Result<(), String> {
+        match name {
+            "DEF" => self.op_def_with_comment(comment)?,
+            _ => self.execute_builtin(name)?,
+        }
+        Ok(())
+    }
+    
+    fn execute_operator(&mut self, op: &str) -> Result<(), String> {
+        match op {
+            "+" => self.op_add()?,
+            "-" => self.op_sub()?,
+            "*" => self.op_mul()?,
+            "/" => self.op_div()?,
+            ">" => self.op_gt()?,
+            ">=" => self.op_ge()?,
+            "=" => self.op_eq()?,
+            "<" => self.op_lt()?,
+            "<=" => self.op_le()?,
+            _ => return Err(format!("Unknown operator: {}", op)),
+        }
+        Ok(())
+    }
+    
+    // ワードの依存関係を収集
+    fn collect_dependencies(tokens: &[Token]) -> HashSet<String> {
+        let mut deps = HashSet::new();
+        for token in tokens {
+            if let Token::Symbol(name) = token {
+                deps.insert(name.clone());
+            }
+        }
+        deps
+    }
+    
+    // ワードの削除（DEL命令用）
+    pub fn delete_word(&mut self, name: &str) -> Result<(), String> {
+        // 組み込みワードは削除不可
+        if let Some(def) = self.dictionary.get(name) {
+            if def.is_builtin {
+                return Err(format!("Cannot delete builtin word: {}", name));
+            }
+        } else {
+            return Err(format!("Word not found: {}", name));
+        }
+        
+        // 依存関係チェック
+        if let Some(dependents) = self.dependencies.get(name) {
+            if !dependents.is_empty() {
+                let dependent_list: Vec<String> = dependents.iter().cloned().collect();
+                return Err(format!(
+                    "Cannot delete '{}' because it is used by: {}", 
+                    name, 
+                    dependent_list.join(", ")
+                ));
+            }
+        }
+        
+        // ワードを削除
+        self.dictionary.remove(name);
+        
+        // このワードが依存していた他のワードから、依存関係を削除
+        for (_, deps) in self.dependencies.iter_mut() {
+            deps.remove(name);
+        }
+        
+        // 依存関係エントリ自体も削除
+        self.dependencies.remove(name);
+        
+        Ok(())
+    }
+    
+    // スタック操作
+    fn op_dup(&mut self) -> Result<(), String> {
+        if let Some(top) = self.stack.last() {
+            self.stack.push(top.clone());
+            Ok(())
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    fn op_drop(&mut self) -> Result<(), String> {
+        if self.stack.pop().is_none() {
+            Err("Stack underflow".to_string())
+        } else {
+            Ok(())
+        }
+    }
+    
+    fn op_swap(&mut self) -> Result<(), String> {
+        let len = self.stack.len();
+        if len < 2 {
+            Err("Stack underflow".to_string())
+        } else {
+            self.stack.swap(len - 1, len - 2);
+            Ok(())
+        }
+    }
+    
+    fn op_over(&mut self) -> Result<(), String> {
+        let len = self.stack.len();
+        if len < 2 {
+            Err("Stack underflow".to_string())
+        } else {
+            let item = self.stack[len - 2].clone();
+            self.stack.push(item);
+            Ok(())
+        }
+    }
+    
+    fn op_rot(&mut self) -> Result<(), String> {
+        let len = self.stack.len();
+        if len < 3 {
+            Err("Stack underflow".to_string())
+        } else {
+            let third = self.stack.remove(len - 3);
+            self.stack.push(third);
+            Ok(())
+        }
+    }
+    
+    // レジスタ操作
+    fn op_to_r(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            self.register = Some(val);
+            Ok(())
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    fn op_from_r(&mut self) -> Result<(), String> {
+        if let Some(val) = self.register.take() {
+            self.stack.push(val);
+            Ok(())
+        } else {
+            Err("Register is empty".to_string())
+        }
+    }
+    
+    fn op_r_fetch(&mut self) -> Result<(), String> {
+        if let Some(val) = &self.register {
+            self.stack.push(val.clone());
+            Ok(())
+        } else {
+            Err("Register is empty".to_string())
+        }
+    }
+    
+    // 遅延評価操作
+    fn op_defer(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            match val.val_type {
+                ValueType::Symbol(name) => {
+                    let thunk = Value::thunk(ThunkComputation::Symbol(name));
+                    self.stack.push(thunk);
+                    Ok(())
+                },
+                ValueType::Vector(vec) => {
+                    let thunk = Value::thunk(ThunkComputation::Vector(vec));
+                    self.stack.push(thunk);
+                    Ok(())
+                },
+                _ => Err("DEFER requires a symbol or vector".to_string()),
+            }
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    fn op_force(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            let forced = self.force_value(&val)?;
+            self.stack.push(forced);
+            Ok(())
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    // 再帰的定義
+    fn op_rec(&mut self) -> Result<(), String> {
+        if self.stack.len() < 2 {
+            return Err("Stack underflow for REC".to_string());
+        }
+        
+        let name_val = self.stack.pop().unwrap();
+        let body_val = self.stack.pop().unwrap();
+        
+        match (&name_val.val_type, &body_val.val_type) {
+            (ValueType::String(name), ValueType::Vector(body)) => {
+                let name = name.to_uppercase();
+                
+                // 組み込みワードの再定義を防ぐ
+                if let Some(existing) = self.dictionary.get(&name) {
+                    if existing.is_builtin {
+                        return Err(format!("Cannot redefine builtin word: {}", name));
+                    }
+                }
+                
+                // ベクトルの内容をトークンに変換（自己参照をDEFERでラップ）
+                let mut tokens = Vec::new();
+                
+                for val in body {
+                    match &val.val_type {
+                        ValueType::Number(n) => {
+                            tokens.push(Token::Number(n.numerator, n.denominator));
+                        },
+                        ValueType::String(s) => {
+                            tokens.push(Token::String(s.clone()));
+                        },
+                        ValueType::Boolean(b) => {
+                            tokens.push(Token::Boolean(*b));
+                        },
+                        ValueType::Symbol(s) => {
+                            if s == &name {
+                                // 自己参照をDEFERでラップ
+                                tokens.push(Token::Symbol(s.clone()));
+                                tokens.push(Token::Symbol("DEFER".to_string()));
+                            } else {
+                                tokens.push(Token::Symbol(s.clone()));
+                            }
+                        },
+                        ValueType::Nil => {
+                            tokens.push(Token::Nil);
+                        },
+                        ValueType::Vector(_) => {
+                            return Err("Nested vectors in word definitions are not yet supported".to_string());
+                        },
+                        ValueType::Thunk(_) => {
+                            return Err("Thunks in word definitions are not supported".to_string());
+                        }
+                    }
+                }
+                
+                // ワードを定義
+                self.dictionary.insert(name.clone(), WordDefinition {
+                    tokens,
+                    is_builtin: false,
+                    description: None,
+                });
+                
+                Ok(())
+            },
+            _ => Err("Type error: REC requires a vector and a string".to_string()),
+        }
+    }
    
    // 算術演算
    fn op_add(&mut self) -> Result<(), String> {
