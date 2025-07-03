@@ -262,22 +262,53 @@ pub fn force_value(&mut self, value: &Value) -> Result<Value, String> {
                         Err("Invalid expression".to_string())
                     }
                 },
-                ThunkComputation::Application { function, args } => {
-                    // 引数をスタックに積む
-                    for arg in args {
-                        self.stack.push(arg);
-                    }
-                    
-                    // 関数を実行
-                    self.execute_symbol(&function)?;
-                    
-                    // 結果を取得
-                    if let Some(result) = self.stack.pop() {
-                        Ok(result)
-                    } else {
-                        Err("Function produced no result".to_string())
-                    }
+                ThunkComputation::Expression(values) => {
+    // ベクトルを式として実行
+    if values.len() == 1 && matches!(values[0].val_type, ValueType::Vector(_)) {
+        // スタックの現在の状態を保存
+        let saved_stack = self.stack.clone();
+        self.stack.clear();
+        
+        // ベクトルの内容をスタックに積む
+        if let ValueType::Vector(vec) = &values[0].val_type {
+            for elem in vec {
+                self.stack.push(elem.clone());
+            }
+        }
+        
+        // execute_tokens_with_contextの代わりに、
+        // スタック上の値を順番に処理
+        let mut temp_stack = Vec::new();
+        while let Some(val) = self.stack.pop() {
+            temp_stack.push(val);
+        }
+        temp_stack.reverse();
+        
+        // 元のスタックを復元
+        self.stack = saved_stack;
+        
+        // 値を順番に処理
+        for val in temp_stack {
+            match &val.val_type {
+                ValueType::Symbol(sym) => {
+                    self.execute_symbol(sym)?;
                 },
+                _ => {
+                    self.stack.push(val);
+                }
+            }
+        }
+        
+        // 結果を取得
+        if let Some(result) = self.stack.pop() {
+            Ok(result)
+        } else {
+            Ok(Value { val_type: ValueType::Nil })
+        }
+    } else {
+        Err("Invalid expression".to_string())
+    }
+},
             };
             
             // 結果を保存
