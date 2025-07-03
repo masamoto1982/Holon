@@ -483,21 +483,17 @@ pub fn force_value(&mut self, value: &Value) -> Result<Value, String> {
    }
    
    // 遅延評価操作
-   // op_deferを修正
-fn op_defer(&mut self) -> Result<(), String> {
+   fn op_defer(&mut self) -> Result<(), String> {
     if let Some(val) = self.stack.pop() {
         match &val.val_type {
             ValueType::Symbol(name) => {
-                // シンボルは遅延評価
                 let thunk = Value::thunk(ThunkComputation::Symbol(name.clone()));
                 self.stack.push(thunk);
                 Ok(())
             },
-            ValueType::Vector(vec) => {
-                // ベクトルの内容をトークンに変換
-                let tokens = self.value_to_tokens(&val)?;
-                // トークンを実行する計算として保存
-                let thunk = Value::thunk(ThunkComputation::Tokens(tokens));
+            ValueType::Vector(_) => {
+                // ベクトルを式として遅延評価
+                let thunk = Value::thunk(ThunkComputation::Expression(vec![val]));
                 self.stack.push(thunk);
                 Ok(())
             },
