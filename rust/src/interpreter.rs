@@ -469,25 +469,35 @@ impl Interpreter {
    }
    
    // 遅延評価操作
-   fn op_defer(&mut self) -> Result<(), String> {
-       if let Some(val) = self.stack.pop() {
-           match val.val_type {
-               ValueType::Symbol(name) => {
-                   let thunk = Value::thunk(ThunkComputation::Symbol(name));
-                   self.stack.push(thunk);
-                   Ok(())
-               },
-               ValueType::Vector(vec) => {
-                   let thunk = Value::thunk(ThunkComputation::Vector(vec));
-                   self.stack.push(thunk);
-                   Ok(())
-               },
-               _ => Err("DEFER requires a symbol or vector".to_string()),
-           }
-       } else {
-           Err("Stack underflow".to_string())
-       }
-   }
+   // op_deferを修正
+fn op_defer(&mut self) -> Result<(), String> {
+    if let Some(val) = self.stack.pop() {
+        match &val.val_type {
+            ValueType::Symbol(name) => {
+                // シンボルは遅延評価
+                let thunk = Value::thunk(ThunkComputation::Symbol(name.clone()));
+                self.stack.push(thunk);
+                Ok(())
+            },
+            ValueType::Vector(vec) => {
+                // ベクトルの内容をトークンに変換
+                let tokens = self.value_to_tokens(&val)?;
+                // トークンを実行する計算として保存
+                let thunk = Value::thunk(ThunkComputation::Tokens(tokens));
+                self.stack.push(thunk);
+                Ok(())
+            },
+            _ => {
+                // その他の値は即値として遅延評価
+                let thunk = Value::thunk(ThunkComputation::Literal(val));
+                self.stack.push(thunk);
+                Ok(())
+            }
+        }
+    } else {
+        Err("Stack underflow".to_string())
+    }
+}
    
    fn op_force(&mut self) -> Result<(), String> {
        if let Some(val) = self.stack.pop() {
