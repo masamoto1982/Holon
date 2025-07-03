@@ -240,18 +240,26 @@ pub fn force_value(&mut self, value: &Value) -> Result<Value, String> {
                         val_type: ValueType::Vector(evaluated),
                     })
                 },
-                ThunkComputation::Tokens(tokens) => {
-                    // トークン列を実行
-                    let saved_stack_len = self.stack.len();
-                    self.execute_tokens_with_context(&tokens, false)?;
-                    
-                    // 実行結果をスタックから取得
-                    if self.stack.len() > saved_stack_len {
-                        // 新しい値がスタックに積まれた
-                        Ok(self.stack.pop().unwrap())
+                ThunkComputation::Expression(values) => {
+                    // ベクトルを式として実行
+                    if values.len() == 1 {
+                        if let ValueType::Vector(vec) = &values[0].val_type {
+                            // ベクトルの内容をトークンに変換して実行
+                            let tokens = self.value_to_tokens(&values[0])?;
+                            let saved_stack_len = self.stack.len();
+                            self.execute_tokens_with_context(&tokens, false)?;
+                            
+                            // 実行結果をスタックから取得
+                            if self.stack.len() > saved_stack_len {
+                                Ok(self.stack.pop().unwrap())
+                            } else {
+                                Ok(Value { val_type: ValueType::Nil })
+                            }
+                        } else {
+                            Ok(values[0].clone())
+                        }
                     } else {
-                        // 何も積まれなかった場合はnil
-                        Ok(Value { val_type: ValueType::Nil })
+                        Err("Invalid expression".to_string())
                     }
                 },
                 ThunkComputation::Application { function, args } => {
