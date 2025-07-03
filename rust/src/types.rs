@@ -31,6 +31,7 @@ pub enum ThunkComputation {
     Literal(Value),
     Symbol(String),
     Vector(Vec<Value>),
+    Tokens(Vec<Token>),  // トークン列を実行する
     Application {
         function: String,
         args: Vec<Value>,
