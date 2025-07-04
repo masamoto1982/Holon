@@ -850,10 +850,11 @@ impl Interpreter {
         return Err("Stack underflow".to_string());
     }
     
-    let elem = self.stack.pop().unwrap();  // 最初に要素をポップ
-    let vec = self.stack.pop().unwrap();   // 次にベクトルをポップ
+    // Forthスタイルの順序：elem list -- (elem . list)
+    let list = self.stack.pop().unwrap();  // 後にプッシュされたリスト
+    let elem = self.stack.pop().unwrap();  // 先にプッシュされた要素
     
-    match vec.val_type {
+    match list.val_type {
         ValueType::Vector(mut v) => {
             v.insert(0, elem);
             self.stack.push(Value {
@@ -861,7 +862,7 @@ impl Interpreter {
             });
             Ok(())
         },
-        _ => Err("Type error: CONS requires a vector and an element".to_string()),
+        _ => Err("Type error: CONS requires an element and a vector".to_string()),
     }
 }
    
