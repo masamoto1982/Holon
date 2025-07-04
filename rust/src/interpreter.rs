@@ -552,58 +552,63 @@ impl Interpreter {
    
    // 再帰的定義
    fn op_rec(&mut self) -> Result<(), String> {
-       if self.stack.len() < 2 {
-           return Err("Stack underflow for REC".to_string());
-       }
-       
-       let name_val = self.stack.pop().unwrap();
-       let body_val = self.stack.pop().unwrap();
-       
-       match (&name_val.val_type, &body_val.val_type) {
-           (ValueType::String(name), ValueType::Vector(body)) => {
-               let name = name.to_uppercase();
-               
-               // 組み込みワードの再定義を防ぐ
-               if let Some(existing) = self.dictionary.get(&name) {
-                   if existing.is_builtin {
-                       return Err(format!("Cannot redefine builtin word: {}", name));
-                   }
-               }
-               
-               // ベクトルの内容を再帰的にトークンに変換（自己参照をDEFERでラップ）
-               let mut tokens = Vec::new();
-               
-               for val in body {
-                   let mut val_tokens = self.value_to_tokens(val)?;
-                   
-                   // 自己参照をDEFERでラップ
-                   let mut i = 0;
-                   while i < val_tokens.len() {
-                       if let Token::Symbol(s) = &val_tokens[i] {
-                           if s == &name {
-                               // 自己参照の後にDEFERを挿入
-                               val_tokens.insert(i + 1, Token::Symbol("DEFER".to_string()));
-                               i += 1; // DEFERの分スキップ
-                           }
-                       }
-                       i += 1;
-                   }
-                   
-                   tokens.extend(val_tokens);
-               }
-               
-               // ワードを定義
-               self.dictionary.insert(name.clone(), WordDefinition {
-                   tokens,
-                   is_builtin: false,
-                   description: None,
-               });
-               
-               Ok(())
-           },
-           _ => Err("Type error: REC requires a vector and a string".to_string()),
-       }
-   }
+    if self.stack.len() < 2 {
+        return Err("Stack underflow for REC".to_string());
+    }
+    
+    let name_val = self.stack.pop().unwrap();
+    let body_val = self.stack.pop().unwrap();
+    
+    match (&name_val.val_type, &body_val.val_type) {
+        (ValueType::String(name), ValueType::Vector(body)) => {
+            let name = name.to_uppercase();
+            
+            // 組み込みワードの再定義を防ぐ
+            if let Some(existing) = self.dictionary.get(&name) {
+                if existing.is_builtin {
+                    return Err(format!("Cannot redefine builtin word: {}", name));
+                }
+            }
+            
+            // ベクトルの内容を再帰的にトークンに変換（自己参照をDEFERでラップ）
+            let mut tokens = Vec::new();
+            
+            for val in body {
+                let val_tokens = self.value_to_tokens(val)?;
+                
+                // 自己参照をDEFERでラップ
+                let mut processed_tokens = Vec::new();
+                let mut i = 0;
+                while i < val_tokens.len() {
+                    if let Token::Symbol(s) = &val_tokens[i] {
+                        if s == &name {
+                            // 自己参照の前にシンボルを追加し、その後にDEFERを追加
+                            processed_tokens.push(Token::Symbol(s.clone()));
+                            processed_tokens.push(Token::Symbol("DEFER".to_string()));
+                        } else {
+                            processed_tokens.push(val_tokens[i].clone());
+                        }
+                    } else {
+                        processed_tokens.push(val_tokens[i].clone());
+                    }
+                    i += 1;
+                }
+                
+                tokens.extend(processed_tokens);
+            }
+            
+            // ワードを定義
+            self.dictionary.insert(name.clone(), WordDefinition {
+                tokens,
+                is_builtin: false,
+                description: None,
+            });
+            
+            Ok(())
+        },
+        _ => Err("Type error: REC requires a vector and a string".to_string()),
+    }
+}
    
    // 算術演算
    fn op_add(&mut self) -> Result<(), String> {
