@@ -570,20 +570,22 @@ impl Interpreter {
                 }
             }
             
-            // ベクトルの内容を再帰的にトークンに変換（自己参照をDEFERでラップ）
+            // ベクトルの内容を再帰的にトークンに変換
             let mut tokens = Vec::new();
             
             for val in body {
                 let val_tokens = self.value_to_tokens(val)?;
                 
-                // 自己参照をDEFERでラップ
+                // 自己参照を検出して変換
                 let mut processed_tokens = Vec::new();
                 let mut i = 0;
                 while i < val_tokens.len() {
                     if let Token::Symbol(s) = &val_tokens[i] {
                         if s == &name {
-                            // 自己参照の前にシンボルを追加し、その後にDEFERを追加
+                            // 自己参照を [ NAME ] DEFER に変換
+                            processed_tokens.push(Token::VectorStart);
                             processed_tokens.push(Token::Symbol(s.clone()));
+                            processed_tokens.push(Token::VectorEnd);
                             processed_tokens.push(Token::Symbol("DEFER".to_string()));
                         } else {
                             processed_tokens.push(val_tokens[i].clone());
