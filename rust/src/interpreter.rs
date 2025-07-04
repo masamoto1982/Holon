@@ -850,11 +850,11 @@ impl Interpreter {
         return Err("Stack underflow".to_string());
     }
     
-    // Forthスタイルの順序：elem list -- (elem . list)
-    let list = self.stack.pop().unwrap();  // 後にプッシュされたリスト
+    // 標準的な順序: elem vector -- (elem . vector)
+    let vec = self.stack.pop().unwrap();   // 後にプッシュされたベクトル
     let elem = self.stack.pop().unwrap();  // 先にプッシュされた要素
     
-    match list.val_type {
+    match vec.val_type {
         ValueType::Vector(mut v) => {
             v.insert(0, elem);
             self.stack.push(Value {
