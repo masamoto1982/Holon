@@ -846,24 +846,24 @@ impl Interpreter {
    }
    
    fn op_cons(&mut self) -> Result<(), String> {
-       if self.stack.len() < 2 {
-           return Err("Stack underflow".to_string());
-       }
-       
-       let vec = self.stack.pop().unwrap();
-       let elem = self.stack.pop().unwrap();
-       
-       match vec.val_type {
-           ValueType::Vector(mut v) => {
-               v.insert(0, elem);
-               self.stack.push(Value {
-                   val_type: ValueType::Vector(v),
-               });
-               Ok(())
-           },
-           _ => Err("Type error: CONS requires an element and a vector".to_string()),
-       }
-   }
+    if self.stack.len() < 2 {
+        return Err("Stack underflow".to_string());
+    }
+    
+    let elem = self.stack.pop().unwrap();  // 最初に要素をポップ
+    let vec = self.stack.pop().unwrap();   // 次にベクトルをポップ
+    
+    match vec.val_type {
+        ValueType::Vector(mut v) => {
+            v.insert(0, elem);
+            self.stack.push(Value {
+                val_type: ValueType::Vector(v),
+            });
+            Ok(())
+        },
+        _ => Err("Type error: CONS requires a vector and an element".to_string()),
+    }
+}
    
    fn op_reverse(&mut self) -> Result<(), String> {
        if let Some(val) = self.stack.pop() {
