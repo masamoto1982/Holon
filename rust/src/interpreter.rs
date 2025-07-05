@@ -202,136 +202,7 @@ impl Interpreter {
                tokens.push(Token::VectorEnd);
                Ok(tokens)
            },
-           ValueType::Thunk(_) => {
-               Err("Cannot convert thunk to tokens".to_string())
-           }
        }
-   }
-   
-   pub fn force_value(&mut self, value: &Value) -> Result<Value, String> {
-    match &value.val_type {
-        ValueType::Thunk(thunk_ref) => {
-            let thunk = thunk_ref.borrow_mut();
-            
-            // 既に評価済みなら結果を返す
-            if thunk.forced {
-                return Ok(thunk.result.as_ref().unwrap().clone());
-            }
-            
-            // 計算を実行
-            let computation = thunk.computation.clone();
-            drop(thunk); // borrow_mutを解放
-            
-            let result = match computation {
-                ThunkComputation::Literal(v) => Ok(v),
-                ThunkComputation::Symbol(name) => {
-                    // シンボルを評価
-                    self.execute_symbol(&name)
-                },
-                ThunkComputation::Vector(elements) => {
-                    // ベクトルの各要素を評価
-                    let mut evaluated = Vec::new();
-                    for elem in elements {
-                        let val = self.force_value(&elem)?;
-                        evaluated.push(val);
-                    }
-                    Ok(Value {
-                        val_type: ValueType::Vector(evaluated),
-                    })
-                },
-                ThunkComputation::Expression(values) => {
-                    // ベクトルを式として実行
-                    if values.len() == 1 && matches!(values[0].val_type, ValueType::Vector(_)) {
-                        // スタックの現在の状態を保存
-                        let saved_stack = self.stack.clone();
-                        self.stack.clear();
-                        
-                        // ベクトルの内容をスタックに積む
-                        if let ValueType::Vector(vec) = &values[0].val_type {
-                            for elem in vec {
-                                self.stack.push(elem.clone());
-                            }
-                        }
-                        
-                        // スタック上の値を順番に処理
-                        let mut temp_stack = Vec::new();
-                        while let Some(val) = self.stack.pop() {
-                            temp_stack.push(val);
-                        }
-                        temp_stack.reverse();
-                        
-                        // 元のスタックを復元
-                        self.stack = saved_stack;
-                        
-                        // 値を順番に処理
-                        for val in temp_stack {
-                            match &val.val_type {
-                                ValueType::Symbol(sym) => {
-                                    self.execute_symbol(sym)?;
-                                },
-                                _ => {
-                                    self.stack.push(val);
-                                }
-                            }
-                        }
-                        
-                        // 結果を取得
-                        if let Some(result) = self.stack.pop() {
-                            Ok(result)
-                        } else {
-                            Ok(Value { val_type: ValueType::Nil })
-                        }
-                    } else {
-                        Err("Invalid expression".to_string())
-                    }
-                },
-                ThunkComputation::Application { function, args } => {
-                    // 引数をスタックに積む
-                    for arg in args {
-                        self.stack.push(arg);
-                    }
-                    
-                    // 関数を実行
-                    self.execute_symbol(&function)?;
-                    
-                    // 結果を取得
-                    if let Some(result) = self.stack.pop() {
-                        Ok(result)
-                    } else {
-                        Err("Function produced no result".to_string())
-                    }
-                },
-            };
-            
-            // 結果を保存
-            if let Ok(ref res) = result {
-                let mut thunk = thunk_ref.borrow_mut();
-                thunk.forced = true;
-                thunk.result = Some(res.clone());
-            }
-            
-            result
-        },
-        _ => Ok(value.clone()), // サンクでなければそのまま返す
-    }
-}
-   
-   // シンボルを実行
-   fn execute_symbol(&mut self, name: &str) -> Result<Value, String> {
-       if matches!(name, "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
-           self.execute_operator(name)?;
-       } else if let Some(def) = self.dictionary.get(name).cloned() {
-           if def.is_builtin {
-               self.execute_builtin(name)?;
-           } else {
-               self.execute_tokens_with_context(&def.tokens, false)?;
-           }
-       } else {
-           return Err(format!("Unknown word: {}", name));
-       }
-       
-       // スタックトップの値を返す
-       self.stack.last().cloned().ok_or_else(|| "No result".to_string())
    }
    
    fn execute_builtin(&mut self, name: &str) -> Result<(), String> {
@@ -355,9 +226,10 @@ impl Interpreter {
            "WORDS" => self.op_words()?,
            "WORDS?" => self.op_words_filter()?,
            "DEL" => self.op_del()?,
-           "DEFER" => self.op_defer()?,
-           "FORCE" => self.op_force()?,
-           "REC" => self.op_rec()?,
+           "TIMES" => self.op_times()?,
+           "WHILE" => self.op_while()?,
+           "REPEAT" => self.op_repeat()?,
+           "FOR" => self.op_for()?,
            _ => return Err(format!("Unknown builtin: {}", name)),
        }
        Ok(())
@@ -513,104 +385,162 @@ impl Interpreter {
        }
    }
    
-   // 遅延評価操作
-   fn op_defer(&mut self) -> Result<(), String> {
-    if let Some(val) = self.stack.pop() {
-        match &val.val_type {
-            ValueType::Symbol(name) => {
-                let thunk = Value::thunk(ThunkComputation::Symbol(name.clone()));
-                self.stack.push(thunk);
-                Ok(())
-            },
-            ValueType::Vector(_) => {
-                // ベクトルを式として遅延評価
-                let thunk = Value::thunk(ThunkComputation::Expression(vec![val]));
-                self.stack.push(thunk);
-                Ok(())
-            },
-            _ => {
-                // その他の値は即値として遅延評価
-                let thunk = Value::thunk(ThunkComputation::Literal(val));
-                self.stack.push(thunk);
-                Ok(())
-            }
-        }
-    } else {
-        Err("Stack underflow".to_string())
-    }
-}
-   
-   fn op_force(&mut self) -> Result<(), String> {
-       if let Some(val) = self.stack.pop() {
-           let forced = self.force_value(&val)?;
-           self.stack.push(forced);
-           Ok(())
-       } else {
-           Err("Stack underflow".to_string())
+   // 反復構造
+   fn op_times(&mut self) -> Result<(), String> {
+       if self.stack.len() < 2 {
+           return Err("Stack underflow".to_string());
+       }
+       
+       let body = self.stack.pop().unwrap();
+       let count = self.stack.pop().unwrap();
+       
+       match (&count.val_type, &body.val_type) {
+           (ValueType::Number(n), ValueType::Vector(_)) => {
+               if n.denominator != 1 || n.numerator < 0 {
+                   return Err("TIMES requires a non-negative integer".to_string());
+               }
+               
+               let tokens = self.value_to_tokens(&body)?;
+               
+               // レジスタに現在のカウンタを保存
+               let saved_register = self.register.clone();
+               
+               for i in 0..n.numerator {
+                   // カウンタをレジスタに設定（0から開始）
+                   self.register = Some(Value {
+                       val_type: ValueType::Number(Fraction::new(i, 1)),
+                   });
+                   
+                   self.execute_tokens_with_context(&tokens, false)?;
+               }
+               
+               // レジスタを復元
+               self.register = saved_register;
+               
+               Ok(())
+           },
+           _ => Err("Type error: TIMES requires a number and a vector".to_string()),
        }
    }
    
-   // 再帰的定義
-   fn op_rec(&mut self) -> Result<(), String> {
-    if self.stack.len() < 2 {
-        return Err("Stack underflow for REC".to_string());
-    }
-    
-    let name_val = self.stack.pop().unwrap();
-    let body_val = self.stack.pop().unwrap();
-    
-    match (&name_val.val_type, &body_val.val_type) {
-        (ValueType::String(name), ValueType::Vector(body)) => {
-            let name = name.to_uppercase();
-            
-            // 組み込みワードの再定義を防ぐ
-            if let Some(existing) = self.dictionary.get(&name) {
-                if existing.is_builtin {
-                    return Err(format!("Cannot redefine builtin word: {}", name));
-                }
-            }
-            
-            // ベクトルの内容を再帰的にトークンに変換
-            let mut tokens = Vec::new();
-            
-            for val in body {
-                let val_tokens = self.value_to_tokens(val)?;
-                
-                // 自己参照を検出して変換
-                let mut processed_tokens = Vec::new();
-                let mut i = 0;
-                while i < val_tokens.len() {
-                    if let Token::Symbol(s) = &val_tokens[i] {
-                        if s == &name {
-                            // 自己参照を [ NAME ] DEFER に変換
-                            processed_tokens.push(Token::VectorStart);
-                            processed_tokens.push(Token::Symbol(s.clone()));
-                            processed_tokens.push(Token::VectorEnd);
-                            processed_tokens.push(Token::Symbol("DEFER".to_string()));
-                        } else {
-                            processed_tokens.push(val_tokens[i].clone());
-                        }
-                    } else {
-                        processed_tokens.push(val_tokens[i].clone());
-                    }
-                    i += 1;
-                }
-                
-                tokens.extend(processed_tokens);
-            }
-            
-            // ワードを定義
-            self.dictionary.insert(name.clone(), WordDefinition {
-                tokens,
-                is_builtin: false,
-                description: None,
-            });
-            
-            Ok(())
-        },
-        _ => Err("Type error: REC requires a vector and a string".to_string()),
-    }
-}
+   fn op_while(&mut self) -> Result<(), String> {
+       if self.stack.len() < 2 {
+           return Err("Stack underflow".to_string());
+       }
+       
+       let body = self.stack.pop().unwrap();
+       let condition = self.stack.pop().unwrap();
+       
+       match (&condition.val_type, &body.val_type) {
+           (ValueType::Vector(_), ValueType::Vector(_)) => {
+               let cond_tokens = self.value_to_tokens(&condition)?;
+               let body_tokens = self.value_to_tokens(&body)?;
+               
+               loop {
+                   // 条件を評価
+                   let stack_before = self.stack.len();
+                   self.execute_tokens_with_context(&cond_tokens, false)?;
+                   
+                   if self.stack.len() <= stack_before {
+                       return Err("WHILE condition must produce a value".to_string());
+                   }
+                   
+                   let result = self.stack.pop().unwrap();
+                   match result.val_type {
+                       ValueType::Boolean(false) => break,
+                       ValueType::Boolean(true) => {
+                           self.execute_tokens_with_context(&body_tokens, false)?;
+                       },
+                       _ => return Err("WHILE condition must produce a boolean".to_string()),
+                   }
+               }
+               
+               Ok(())
+           },
+           _ => Err("Type error: WHILE requires two vectors".to_string()),
+       }
+   }
+   
+   fn op_repeat(&mut self) -> Result<(), String> {
+       if self.stack.len() < 2 {
+           return Err("Stack underflow".to_string());
+       }
+       
+       let condition = self.stack.pop().unwrap();
+       let body = self.stack.pop().unwrap();
+       
+       match (&body.val_type, &condition.val_type) {
+           (ValueType::Vector(_), ValueType::Vector(_)) => {
+               let body_tokens = self.value_to_tokens(&body)?;
+               let cond_tokens = self.value_to_tokens(&condition)?;
+               
+               loop {
+                   // 本体を実行
+                   self.execute_tokens_with_context(&body_tokens, false)?;
+                   
+                   // 条件を評価
+                   let stack_before = self.stack.len();
+                   self.execute_tokens_with_context(&cond_tokens, false)?;
+                   
+                   if self.stack.len() <= stack_before {
+                       return Err("REPEAT condition must produce a value".to_string());
+                   }
+                   
+                   let result = self.stack.pop().unwrap();
+                   match result.val_type {
+                       ValueType::Boolean(true) => break,
+                       ValueType::Boolean(false) => continue,
+                       _ => return Err("REPEAT condition must produce a boolean".to_string()),
+                   }
+               }
+               
+               Ok(())
+           },
+           _ => Err("Type error: REPEAT requires two vectors".to_string()),
+       }
+   }
+   
+   fn op_for(&mut self) -> Result<(), String> {
+       if self.stack.len() < 3 {
+           return Err("Stack underflow".to_string());
+       }
+       
+       let body = self.stack.pop().unwrap();
+       let end = self.stack.pop().unwrap();
+       let start = self.stack.pop().unwrap();
+       
+       match (&start.val_type, &end.val_type, &body.val_type) {
+           (ValueType::Number(s), ValueType::Number(e), ValueType::Vector(_)) => {
+               if s.denominator != 1 || e.denominator != 1 {
+                   return Err("FOR requires integer bounds".to_string());
+               }
+               
+               let tokens = self.value_to_tokens(&body)?;
+               let saved_register = self.register.clone();
+               
+               // 昇順または降順を自動判定
+               if s.numerator <= e.numerator {
+                   for i in s.numerator..=e.numerator {
+                       self.register = Some(Value {
+                           val_type: ValueType::Number(Fraction::new(i, 1)),
+                       });
+                       self.execute_tokens_with_context(&tokens, false)?;
+                   }
+               } else {
+                   for i in (e.numerator..=s.numerator).rev() {
+                       self.register = Some(Value {
+                           val_type: ValueType::Number(Fraction::new(i, 1)),
+                       });
+                       self.execute_tokens_with_context(&tokens, false)?;
+                   }
+               }
+               
+               self.register = saved_register;
+               Ok(())
+           },
+           _ => Err("Type error: FOR requires two numbers and a vector".to_string()),
+       }
+   }
    
    // 算術演算
    fn op_add(&mut self) -> Result<(), String> {
@@ -846,25 +776,25 @@ impl Interpreter {
    }
    
    fn op_cons(&mut self) -> Result<(), String> {
-    if self.stack.len() < 2 {
-        return Err("Stack underflow".to_string());
-    }
-    
-    // スタック: elem vector
-    let vector = self.stack.pop().unwrap();  // 最初にポップ → vector
-    let elem = self.stack.pop().unwrap();    // 2番目にポップ → elem
-    
-    match vector.val_type {  // vectorの型をチェック
-        ValueType::Vector(mut v) => {
-            v.insert(0, elem);
-            self.stack.push(Value {
-                val_type: ValueType::Vector(v),
-            });
-            Ok(())
-        },
-        _ => Err("Type error: CONS requires an element and a vector".to_string()),
-    }
-}
+       if self.stack.len() < 2 {
+           return Err("Stack underflow".to_string());
+       }
+       
+       // スタック: elem vector
+       let vector = self.stack.pop().unwrap();  // 最初にポップ → vector
+       let elem = self.stack.pop().unwrap();    // 2番目にポップ → elem
+       
+       match vector.val_type {  // vectorの型をチェック
+           ValueType::Vector(mut v) => {
+               v.insert(0, elem);
+               self.stack.push(Value {
+                   val_type: ValueType::Vector(v),
+               });
+               Ok(())
+           },
+           _ => Err("Type error: CONS requires an element and a vector".to_string()),
+       }
+   }
    
    fn op_reverse(&mut self) -> Result<(), String> {
        if let Some(val) = self.stack.pop() {
