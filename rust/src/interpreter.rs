@@ -387,41 +387,43 @@ impl Interpreter {
    
    // 反復構造
    fn op_times(&mut self) -> Result<(), String> {
-       if self.stack.len() < 2 {
-           return Err("Stack underflow".to_string());
-       }
-       
-       let body = self.stack.pop().unwrap();
-       let count = self.stack.pop().unwrap();
-       
-       match (&count.val_type, &body.val_type) {
-           (ValueType::Number(n), ValueType::Vector(_)) => {
-               if n.denominator != 1 || n.numerator < 0 {
-                   return Err("TIMES requires a non-negative integer".to_string());
-               }
-               
-               let tokens = self.value_to_tokens(&body)?;
-               
-               // レジスタに現在のカウンタを保存
-               let saved_register = self.register.clone();
-               
-               for i in 0..n.numerator {
-                   // カウンタをレジスタに設定（0から開始）
-                   self.register = Some(Value {
-                       val_type: ValueType::Number(Fraction::new(i, 1)),
-                   });
-                   
-                   self.execute_tokens_with_context(&tokens, false)?;
-               }
-               
-               // レジスタを復元
-               self.register = saved_register;
-               
-               Ok(())
-           },
-           _ => Err("Type error: TIMES requires a number and a vector".to_string()),
-       }
-   }
+    if self.stack.len() < 2 {
+        return Err("Stack underflow".to_string());
+    }
+    
+    let body = self.stack.pop().unwrap();
+    let count = self.stack.pop().unwrap();
+    
+    match (&count.val_type, &body.val_type) {
+        (ValueType::Number(n), ValueType::Vector(_)) => {
+            if n.denominator != 1 || n.numerator < 0 {
+                return Err("TIMES requires a non-negative integer".to_string());
+            }
+            
+            // ベクトルをトークンに変換してから実行する必要がある
+            let tokens = self.value_to_tokens(&body)?;
+            
+            // レジスタに現在のカウンタを保存
+            let saved_register = self.register.clone();
+            
+            for i in 0..n.numerator {
+                // カウンタをレジスタに設定（0から開始）
+                self.register = Some(Value {
+                    val_type: ValueType::Number(Fraction::new(i, 1)),
+                });
+                
+                // トークンを実行（in_vector = falseで実行）
+                self.execute_tokens_with_context(&tokens, false)?;
+            }
+            
+            // レジスタを復元
+            self.register = saved_register;
+            
+            Ok(())
+        },
+        _ => Err("Type error: TIMES requires a number and a vector".to_string()),
+    }
+}
    
    fn op_while(&mut self) -> Result<(), String> {
        if self.stack.len() < 2 {
