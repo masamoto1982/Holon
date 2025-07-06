@@ -395,13 +395,10 @@ impl Interpreter {
     let count = self.stack.pop().unwrap();
     
     match (&count.val_type, &body.val_type) {
-        (ValueType::Number(n), ValueType::Vector(_)) => {
+        (ValueType::Number(n), ValueType::Vector(vec)) => {
             if n.denominator != 1 || n.numerator < 0 {
                 return Err("TIMES requires a non-negative integer".to_string());
             }
-            
-            // ベクトルをトークンに変換してから実行する必要がある
-            let tokens = self.value_to_tokens(&body)?;
             
             // レジスタに現在のカウンタを保存
             let saved_register = self.register.clone();
@@ -412,8 +409,29 @@ impl Interpreter {
                     val_type: ValueType::Number(Fraction::new(i, 1)),
                 });
                 
-                // トークンを実行（in_vector = falseで実行）
-                self.execute_tokens_with_context(&tokens, false)?;
+                // ベクトルの中身を直接実行
+                for val in vec {
+                    match &val.val_type {
+                        ValueType::Symbol(sym) => {
+                            // シンボルは実行
+                            if let Some(def) = self.dictionary.get(sym) {
+                                if def.is_builtin {
+                                    self.execute_builtin(sym)?;
+                                } else {
+                                    self.execute_tokens_with_context(&def.tokens.clone(), false)?;
+                                }
+                            } else if matches!(sym.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
+                                self.execute_operator(sym)?;
+                            } else {
+                                return Err(format!("Unknown word: {}", sym));
+                            }
+                        },
+                        _ => {
+                            // その他の値はスタックに積む
+                            self.stack.push(val.clone());
+                        }
+                    }
+                }
             }
             
             // レジスタを復元
@@ -424,44 +442,6 @@ impl Interpreter {
         _ => Err("Type error: TIMES requires a number and a vector".to_string()),
     }
 }
-   
-   fn op_while(&mut self) -> Result<(), String> {
-       if self.stack.len() < 2 {
-           return Err("Stack underflow".to_string());
-       }
-       
-       let body = self.stack.pop().unwrap();
-       let condition = self.stack.pop().unwrap();
-       
-       match (&condition.val_type, &body.val_type) {
-           (ValueType::Vector(_), ValueType::Vector(_)) => {
-               let cond_tokens = self.value_to_tokens(&condition)?;
-               let body_tokens = self.value_to_tokens(&body)?;
-               
-               loop {
-                   // 条件を評価
-                   let stack_before = self.stack.len();
-                   self.execute_tokens_with_context(&cond_tokens, false)?;
-                   
-                   if self.stack.len() <= stack_before {
-                       return Err("WHILE condition must produce a value".to_string());
-                   }
-                   
-                   let result = self.stack.pop().unwrap();
-                   match result.val_type {
-                       ValueType::Boolean(false) => break,
-                       ValueType::Boolean(true) => {
-                           self.execute_tokens_with_context(&body_tokens, false)?;
-                       },
-                       _ => return Err("WHILE condition must produce a boolean".to_string()),
-                   }
-               }
-               
-               Ok(())
-           },
-           _ => Err("Type error: WHILE requires two vectors".to_string()),
-       }
-   }
    
    fn op_repeat(&mut self) -> Result<(), String> {
        if self.stack.len() < 2 {
