@@ -393,48 +393,57 @@ fn collect_do_loop(&self, tokens: &[Token]) -> Result<(Vec<Token>, usize), Strin
     }
     
     // ループプリミティブ
-    fn op_do(&mut self, loop_body: Vec<Token>) -> Result<(), String> {
-        if self.stack.len() < 2 {
-            return Err("Stack underflow for DO".to_string());
-        }
-        
-        let limit = self.stack.pop().unwrap();
-        let start = self.stack.pop().unwrap();
-        
-        match (&start.val_type, &limit.val_type) {
-            (ValueType::Number(s), ValueType::Number(l)) => {
-                if s.denominator != 1 || l.denominator != 1 {
-                    return Err("DO requires integer bounds".to_string());
-                }
+fn op_do(&mut self, loop_body: Vec<Token>) -> Result<(), String> {
+    debug_log!("op_do: starting with loop_body: {:?}", loop_body);
+    
+    if self.stack.len() < 2 {
+        return Err("Stack underflow for DO".to_string());
+    }
+    
+    let limit = self.stack.pop().unwrap();
+    let start = self.stack.pop().unwrap();
+    
+    debug_log!("op_do: start={:?}, limit={:?}", start, limit);
+    
+    match (&start.val_type, &limit.val_type) {
+        (ValueType::Number(s), ValueType::Number(l)) => {
+            if s.denominator != 1 || l.denominator != 1 {
+                return Err("DO requires integer bounds".to_string());
+            }
+            
+            debug_log!("op_do: loop from {} to {}", s.numerator, l.numerator);
+            
+            // リターンスタックに限界値を保存
+            self.return_stack.push(Value {
+                val_type: ValueType::Number(Fraction::new(l.numerator, 1)),
+            });
+            
+            for index in s.numerator..l.numerator {
+                debug_log!("op_do: iteration {}", index);
                 
-                // リターンスタックに限界値と現在値をプッシュ
+                // 現在のインデックスをリターンスタックに
                 self.return_stack.push(Value {
-                    val_type: ValueType::Number(Fraction::new(l.numerator, 1)),
+                    val_type: ValueType::Number(Fraction::new(index, 1)),
                 });
                 
-                let mut index = s.numerator;
-                while index < l.numerator {
-                    // 現在のインデックスをリターンスタックに
-                    self.return_stack.push(Value {
-                        val_type: ValueType::Number(Fraction::new(index, 1)),
-                    });
-                    
-                    // ループ本体を実行
-                    self.execute_tokens(&loop_body)?;
-                    
-                    // インデックスをリターンスタックから取り出し
-                    self.return_stack.pop();
-                    index += 1;
-                }
+                // ループ本体を実行
+                self.execute_tokens(&loop_body)?;
                 
-                // 限界値をリターンスタックから削除
+                debug_log!("op_do: after iteration {}, stack size: {}", index, self.stack.len());
+                
+                // インデックスをリターンスタックから削除
                 self.return_stack.pop();
-                
-                Ok(())
-            },
-            _ => Err("Type error: DO requires two numbers".to_string()),
-        }
+            }
+            
+            // 限界値をリターンスタックから削除
+            self.return_stack.pop();
+            
+            debug_log!("op_do: completed, final stack size: {}", self.stack.len());
+            Ok(())
+        },
+        _ => Err("Type error: DO requires two numbers".to_string()),
     }
+}
     
     fn op_begin_again(&mut self, loop_body: Vec<Token>) -> Result<(), String> {
         // 無限ループ（実際には安全のため上限を設ける）
