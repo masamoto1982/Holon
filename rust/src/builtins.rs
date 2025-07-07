@@ -32,8 +32,6 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     register_builtin(dictionary, "IF", "条件分岐 ( bool vec vec -- ... )");
     
     // 辞書操作
-    register_builtin(dictionary, "WORDS", "全ワードをスタックに積む ( -- str... )");
-    register_builtin(dictionary, "WORDS?", "プレフィックスでフィルタ ( str -- str... )");
     register_builtin(dictionary, "DEL", "カスタムワードを削除 ( str -- )");
     
     // 算術演算子
@@ -48,6 +46,9 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     register_builtin(dictionary, "=", "等しい ( a b -- bool )");
     register_builtin(dictionary, "<", "より小さい ( a b -- bool )");
     register_builtin(dictionary, "<=", "以下 ( a b -- bool )");
+    
+    // 論理演算子
+    register_builtin(dictionary, "NOT", "論理否定 ( bool -- bool )");
 }
 
 fn register_builtin(dictionary: &mut HashMap<String, WordDefinition>, name: &str, description: &str) {
