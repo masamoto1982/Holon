@@ -132,6 +132,7 @@ renderDictionary() {
         { name: '>=', description: '以上 ( a b -- bool )' },
         { name: '<', description: 'より小さい ( a b -- bool )' },
         { name: '<=', description: '以下 ( a b -- bool )' },
+        { name: 'NOT', description: '論理否定 ( bool -- bool )' },
         { name: 'DUP', description: 'スタックトップを複製 ( a -- a a )' },
         { name: 'DROP', description: 'スタックトップを削除 ( a -- )' },
         { name: 'SWAP', description: '上位2つを交換 ( a b -- b a )' },
@@ -146,10 +147,11 @@ renderDictionary() {
         { name: 'CONS', description: '要素を先頭に追加 ( elem vec -- vec\' )' },
         { name: 'REVERSE', description: 'ベクトルを逆順に ( vec -- vec\' )' },
         { name: 'NTH', description: 'N番目の要素を取得（負数は末尾から） ( n vec -- elem )' },
+        { name: 'UNCONS', description: 'ベクトルを先頭要素と残りに分解 ( vec -- elem vec\' )' },
+        { name: 'EACH', description: 'ベクトルの各要素をスタックに展開 ( vec -- elem... )' },
+        { name: 'EMPTY?', description: 'ベクトルが空かチェック ( vec -- bool )' },
         { name: 'DEF', description: '新しいワードを定義 ( vec str -- )' },
         { name: 'IF', description: '条件分岐 ( bool vec vec -- ... )' },
-        { name: 'WORDS', description: '全ワードをスタックに積む ( -- str... )' },
-        { name: 'WORDS?', description: 'プレフィックスでフィルタ ( str -- str... )' },
         { name: 'DEL', description: 'カスタムワードを削除 ( str -- )' }
     ];
     this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords, false);
