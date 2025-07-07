@@ -207,30 +207,37 @@ impl Interpreter {
     }
     
     // DO-LOOPの本体を収集
-    fn collect_do_loop(&self, tokens: &[Token]) -> Result<(Vec<Token>, usize), String> {
-        let mut loop_tokens = Vec::new();
-        let mut depth = 1;
-        let mut i = 0;
-        
-        while i < tokens.len() && depth > 0 {
-            match &tokens[i] {
-                Token::Symbol(s) if s == "DO" => depth += 1,
-                Token::Symbol(s) if s == "LOOP" || s == "+LOOP" => {
-                    depth -= 1;
-                    if depth == 0 {
-                        return Ok((loop_tokens, i + 1));
-                    }
-                },
-                _ => {},
-            }
-            if depth > 0 {
+fn collect_do_loop(&self, tokens: &[Token]) -> Result<(Vec<Token>, usize), String> {
+    let mut loop_tokens = Vec::new();
+    let mut depth = 1;
+    let mut i = 0;
+    
+    debug_log!("collect_do_loop: starting with tokens: {:?}", tokens);
+    
+    while i < tokens.len() && depth > 0 {
+        match &tokens[i] {
+            Token::Symbol(s) if s == "DO" => {
+                depth += 1;
                 loop_tokens.push(tokens[i].clone());
-            }
-            i += 1;
+            },
+            Token::Symbol(s) if s == "LOOP" || s == "+LOOP" => {
+                depth -= 1;
+                if depth == 0 {
+                    debug_log!("collect_do_loop: found LOOP at position {}", i);
+                    return Ok((loop_tokens, i + 2)); // +2 to include LOOP in consumed count
+                } else {
+                    loop_tokens.push(tokens[i].clone());
+                }
+            },
+            _ => {
+                loop_tokens.push(tokens[i].clone());
+            },
         }
-        
-        Err("Unclosed DO loop".to_string())
+        i += 1;
     }
+    
+    Err("Unclosed DO loop".to_string())
+}
     
     // BEGIN-END構造の本体を収集
     fn collect_begin_loop(&self, tokens: &[Token]) -> Result<(Vec<Token>, String, usize), String> {
