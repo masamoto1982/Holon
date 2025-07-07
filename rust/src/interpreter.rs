@@ -842,28 +842,62 @@ impl Interpreter {
         }
     }
     
-    fn op_if(&mut self) -> Result<(), String> {
-        if self.stack.len() < 3 {
-            return Err("Stack underflow for IF".to_string());
-        }
-        
-        let else_branch = self.stack.pop().unwrap();
-        let then_branch = self.stack.pop().unwrap();
-        let condition = self.stack.pop().unwrap();
-        
-        match (&condition.val_type, &then_branch.val_type, &else_branch.val_type) {
-            (ValueType::Boolean(cond), ValueType::Vector(then_tokens), ValueType::Vector(else_tokens)) => {
-                let tokens_to_execute = if *cond { then_tokens } else { else_tokens };
-                
-                // ベクトルの内容を実行
-                for val in tokens_to_execute {
-                    self.stack.push(val.clone());
-                }
-                Ok(())
-            },
-            _ => Err("Type error: IF requires a boolean and two vectors".to_string()),
+    // rust/src/interpreter.rs の op_if 関数を修正
+fn op_if(&mut self) -> Result<(), String> {
+    if self.stack.len() < 3 {
+        return Err("Stack underflow for IF".to_string());
+    }
+    
+    let else_branch = self.stack.pop().unwrap();
+    let then_branch = self.stack.pop().unwrap();
+    let condition = self.stack.pop().unwrap();
+    
+    match (&condition.val_type, &then_branch.val_type, &else_branch.val_type) {
+        (ValueType::Boolean(cond), ValueType::Vector(then_tokens), ValueType::Vector(else_tokens)) => {
+            let tokens_to_execute = if *cond { then_tokens } else { else_tokens };
+            
+            // ベクトルの内容をトークンに変換して実行
+            let mut tokens = Vec::new();
+            for val in tokens_to_execute {
+                self.value_to_token(val, &mut tokens)?;
+            }
+            
+            // トークンを実行
+            self.execute_tokens_with_context(&tokens, false)?;
+            Ok(())
+        },
+        _ => Err("Type error: IF requires a boolean and two vectors".to_string()),
+    }
+}
+
+// 値をトークンに変換するヘルパー関数を追加
+fn value_to_token(&self, val: &Value, tokens: &mut Vec<Token>) -> Result<(), String> {
+    match &val.val_type {
+        ValueType::Number(n) => {
+            tokens.push(Token::Number(n.numerator, n.denominator));
+        },
+        ValueType::String(s) => {
+            tokens.push(Token::String(s.clone()));
+        },
+        ValueType::Boolean(b) => {
+            tokens.push(Token::Boolean(*b));
+        },
+        ValueType::Symbol(s) => {
+            tokens.push(Token::Symbol(s.clone()));
+        },
+        ValueType::Nil => {
+            tokens.push(Token::Nil);
+        },
+        ValueType::Vector(v) => {
+            tokens.push(Token::VectorStart);
+            for item in v {
+                self.value_to_token(item, tokens)?;
+            }
+            tokens.push(Token::VectorEnd);
         }
     }
+    Ok(())
+}
     
     // 辞書操作
     fn op_words(&mut self) -> Result<(), String> {
