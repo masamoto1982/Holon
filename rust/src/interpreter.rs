@@ -215,8 +215,6 @@ impl Interpreter {
             "UNCONS" => self.op_uncons()?,
             "EACH" => self.op_each()?,
             "EMPTY?" => self.op_empty()?,
-            "WORDS" => self.op_words()?,
-            "WORDS?" => self.op_words_filter()?,
             "DEL" => self.op_del()?,
             _ => return Err(format!("Unknown builtin: {}", name)),
         }
@@ -899,45 +897,23 @@ fn value_to_token(&self, val: &Value, tokens: &mut Vec<Token>) -> Result<(), Str
     Ok(())
 }
     
-    // 辞書操作
-    fn op_words(&mut self) -> Result<(), String> {
-        let mut words: Vec<String> = self.dictionary.keys().cloned().collect();
-        words.sort();
-        
-        for word in words {
-            self.stack.push(Value {
-                val_type: ValueType::String(word),
-            });
+    // 論理演算子
+fn op_not(&mut self) -> Result<(), String> {
+    if let Some(val) = self.stack.pop() {
+        match val.val_type {
+            ValueType::Boolean(b) => {
+                self.stack.push(Value {
+                    val_type: ValueType::Boolean(!b),
+                });
+                Ok(())
+            },
+            _ => Err("Type error: NOT requires a boolean".to_string()),
         }
-        Ok(())
+    } else {
+        Err("Stack underflow".to_string())
     }
+}
     
-    fn op_words_filter(&mut self) -> Result<(), String> {
-        if let Some(val) = self.stack.pop() {
-            match val.val_type {
-                ValueType::String(prefix) => {
-                    // プレフィックスも大文字に正規化
-                    let prefix = prefix.to_uppercase();
-                    let mut words: Vec<String> = self.dictionary
-                        .keys()
-                        .filter(|k| k.starts_with(&prefix))
-                        .cloned()
-                        .collect();
-                    words.sort();
-                    
-                    for word in words {
-                        self.stack.push(Value {
-                            val_type: ValueType::String(word),
-                        });
-                    }
-                    Ok(())
-                },
-                _ => Err("Type error: WORDS? requires a string".to_string()),
-            }
-        } else {
-            Err("Stack underflow".to_string())
-        }
-    }
     
     // DEL命令の実装
     fn op_del(&mut self) -> Result<(), String> {
