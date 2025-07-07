@@ -22,6 +22,11 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     register_builtin(dictionary, "REVERSE", "ベクトルを逆順に ( vec -- vec' )");
     register_builtin(dictionary, "NTH", "N番目の要素を取得（負数は末尾から） ( n vec -- elem )");
     
+    // スタックベース反復サポート
+    register_builtin(dictionary, "UNCONS", "ベクトルを先頭要素と残りに分解 ( vec -- elem vec' )");
+    register_builtin(dictionary, "EACH", "ベクトルの各要素をスタックに展開 ( vec -- elem... )");
+    register_builtin(dictionary, "EMPTY?", "ベクトルが空かチェック ( vec -- bool )");
+    
     // 制御構造
     register_builtin(dictionary, "DEF", "新しいワードを定義 ( vec str -- )");
     register_builtin(dictionary, "IF", "条件分岐 ( bool vec vec -- ... )");
