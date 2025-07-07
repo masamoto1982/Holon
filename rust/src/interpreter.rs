@@ -519,15 +519,19 @@ fn op_do(&mut self, loop_body: Vec<Token>) -> Result<(), String> {
     }
     
     // ループインデックスアクセス
-    fn op_i(&mut self) -> Result<(), String> {
-        if self.return_stack.is_empty() {
-            return Err("I used outside of loop".to_string());
-        }
-        
-        let index = self.return_stack.last().unwrap().clone();
-        self.stack.push(index);
-        Ok(())
+fn op_i(&mut self) -> Result<(), String> {
+    debug_log!("op_i: return_stack size: {}", self.return_stack.len());
+    
+    if self.return_stack.is_empty() {
+        return Err("I used outside of loop".to_string());
     }
+    
+    // リターンスタックの最上位がインデックス
+    let index = self.return_stack.last().unwrap().clone();
+    debug_log!("op_i: pushing index {:?} to stack", index);
+    self.stack.push(index);
+    Ok(())
+}
     
     fn op_j(&mut self) -> Result<(), String> {
         if self.return_stack.len() < 3 {
