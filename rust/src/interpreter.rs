@@ -135,10 +135,11 @@ impl Interpreter {
                         // ループ制御ワードの特別処理
                         match name.as_str() {
                             "DO" => {
-                                let (loop_tokens, consumed) = self.collect_do_loop(&tokens[i+1..])?;
-                                self.op_do(loop_tokens)?;
-                                i += consumed;
-                            },
+    let (loop_tokens, consumed) = self.collect_do_loop(&tokens[i+1..])?;
+    debug_log!("DO: collected tokens: {:?}, consumed: {}", loop_tokens, consumed);
+    self.op_do(loop_tokens)?;
+    i += consumed; // i+1ではなくconsumedを加算
+},
                             "BEGIN" => {
                                 let (loop_tokens, end_type, consumed) = self.collect_begin_loop(&tokens[i+1..])?;
                                 match end_type.as_str() {
