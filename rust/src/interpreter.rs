@@ -73,17 +73,36 @@ impl Interpreter {
             },
             Token::VectorStart => {
                 let (vector_tokens, consumed) = self.collect_vector(&tokens[i..])?;
-                let saved_stack = self.stack.clone();
-                self.stack.clear();
                 
-                self.execute_tokens_with_context(&vector_tokens, true)?;
-                
-                let vector_contents = self.stack.clone();
-                self.stack = saved_stack;
-                
-                self.stack.push(Value {
-                    val_type: ValueType::Vector(vector_contents),
-                });
+                if in_vector {
+                    // ネストされたベクトル内でのベクトル作成
+                    let saved_stack = self.stack.clone();
+                    let saved_register = self.register.clone();
+                    self.stack.clear();
+                    
+                    self.execute_tokens_with_context(&vector_tokens, true)?;
+                    
+                    let vector_contents = self.stack.clone();
+                    self.stack = saved_stack;
+                    self.register = saved_register;
+                    
+                    self.stack.push(Value {
+                        val_type: ValueType::Vector(vector_contents),
+                    });
+                } else {
+                    // トップレベルでのベクトル作成
+                    let saved_stack = self.stack.clone();
+                    self.stack.clear();
+                    
+                    self.execute_tokens_with_context(&vector_tokens, true)?;
+                    
+                    let vector_contents = self.stack.clone();
+                    self.stack = saved_stack;
+                    
+                    self.stack.push(Value {
+                        val_type: ValueType::Vector(vector_contents),
+                    });
+                }
                 
                 i += consumed - 1;
             },
@@ -193,6 +212,9 @@ impl Interpreter {
             "CONS" => self.op_cons()?,
             "REVERSE" => self.op_reverse()?,
             "NTH" => self.op_nth()?,
+            "UNCONS" => self.op_uncons()?,
+            "EACH" => self.op_each()?,
+            "EMPTY?" => self.op_empty()?,
             "WORDS" => self.op_words()?,
             "WORDS?" => self.op_words_filter()?,
             "DEL" => self.op_del()?,
@@ -655,6 +677,61 @@ impl Interpreter {
         }
     }
     
+    // スタックベース反復サポート
+    fn op_uncons(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            match val.val_type {
+                ValueType::Vector(v) => {
+                    if v.is_empty() {
+                        return Err("UNCONS of empty vector".to_string());
+                    }
+                    let mut v = v;
+                    let head = v.remove(0);
+                    self.stack.push(head);
+                    self.stack.push(Value {
+                        val_type: ValueType::Vector(v),
+                    });
+                    Ok(())
+                },
+                _ => Err("Type error: UNCONS requires a vector".to_string()),
+            }
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    fn op_each(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            match val.val_type {
+                ValueType::Vector(v) => {
+                    for item in v {
+                        self.stack.push(item);
+                    }
+                    Ok(())
+                },
+                _ => Err("Type error: EACH requires a vector".to_string()),
+            }
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    fn op_empty(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            match val.val_type {
+                ValueType::Vector(v) => {
+                    self.stack.push(Value {
+                        val_type: ValueType::Boolean(v.is_empty()),
+                    });
+                    Ok(())
+                },
+                _ => Err("Type error: EMPTY? requires a vector".to_string()),
+            }
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
     // 制御構造
     fn op_def(&mut self) -> Result<(), String> {
         self.op_def_with_comment(None)
@@ -706,7 +783,8 @@ impl Interpreter {
                 let mut tokens = Vec::new();
                 let mut used_words = HashSet::new();
                 
-                for val in body {
+                // ベクトルの内容をトークンに変換する補助関数
+                fn value_to_tokens(val: &Value, tokens: &mut Vec<Token>, used_words: &mut HashSet<String>, dictionary: &HashMap<String, WordDefinition>) -> Result<(), String> {
                     match &val.val_type {
                         ValueType::Number(n) => {
                             tokens.push(Token::Number(n.numerator, n.denominator));
@@ -720,17 +798,27 @@ impl Interpreter {
                         ValueType::Symbol(s) => {
                             tokens.push(Token::Symbol(s.clone()));
                             // カスタムワードの使用を記録
-                            if self.dictionary.contains_key(s) && !self.dictionary.get(s).unwrap().is_builtin {
+                            if dictionary.contains_key(s) && !dictionary.get(s).unwrap().is_builtin {
                                 used_words.insert(s.clone());
                             }
                         },
                         ValueType::Nil => {
                             tokens.push(Token::Nil);
                         },
-                        ValueType::Vector(_) => {
-                            return Err("Nested vectors in word definitions are not yet supported".to_string());
+                        ValueType::Vector(v) => {
+                            // ネストされたベクトルをサポート
+                            tokens.push(Token::VectorStart);
+                            for item in v {
+                                value_to_tokens(item, tokens, used_words, dictionary)?;
+                            }
+                            tokens.push(Token::VectorEnd);
                         }
                     }
+                    Ok(())
+                }
+                
+                for val in body {
+                    value_to_tokens(val, &mut tokens, &mut used_words, &self.dictionary)?;
                 }
                 
                 // 新しい依存関係を追加
