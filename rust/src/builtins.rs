@@ -9,10 +9,14 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     register_builtin(dictionary, "OVER", "2番目をコピー ( a b -- a b a )");
     register_builtin(dictionary, "ROT", "3番目を最上位へ ( a b c -- b c a )");
     
-    // レジスタ操作
-    register_builtin(dictionary, ">R", "スタックからレジスタへ移動 ( a -- )");
-    register_builtin(dictionary, "R>", "レジスタからスタックへ移動 ( -- a )");
-    register_builtin(dictionary, "R@", "レジスタの値をコピー ( -- a )");
+    // リターンスタック操作
+    register_builtin(dictionary, ">R", "スタックからリターンスタックへ移動 ( a -- )");
+    register_builtin(dictionary, "R>", "リターンスタックからスタックへ移動 ( -- a )");
+    register_builtin(dictionary, "R@", "リターンスタックの値をコピー ( -- a )");
+    
+    // ループインデックス
+    register_builtin(dictionary, "I", "最内側ループのインデックス ( -- n )");
+    register_builtin(dictionary, "J", "外側ループのインデックス ( -- n )");
     
     // ベクトル操作
     register_builtin(dictionary, "LENGTH", "ベクトルの長さ ( vec -- n )");
@@ -26,11 +30,7 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     register_builtin(dictionary, "DEF", "新しいワードを定義 ( vec str -- )");
     register_builtin(dictionary, "IF", "条件分岐 ( bool vec vec -- ... )");
     
-    // 反復構造
-    register_builtin(dictionary, "TIMES", "指定回数繰り返す ( n vec -- )");
-    register_builtin(dictionary, "WHILE", "条件が真の間繰り返す ( cond-vec body-vec -- )");
-    register_builtin(dictionary, "REPEAT", "条件が真になるまで繰り返す ( body-vec cond-vec -- )");
-    register_builtin(dictionary, "FOR", "範囲で繰り返す ( start end vec -- )");
+    // 注意: DO, BEGIN, WHILE等は特殊処理のため、ここには登録しない
     
     // 辞書操作
     register_builtin(dictionary, "WORDS", "全ワードをスタックに積む ( -- str... )");
