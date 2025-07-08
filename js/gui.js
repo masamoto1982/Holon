@@ -145,6 +145,7 @@ renderDictionary() {
         { name: 'HEAD', description: '最初の要素 ( vec -- elem )' },
         { name: 'TAIL', description: '最初以外の要素 ( vec -- vec\' )' },
         { name: 'CONS', description: '要素を先頭に追加 ( elem vec -- vec\' )' },
+        { name: 'APPEND', description: '要素を末尾に追加 ( vec elem -- vec\' )' },
         { name: 'REVERSE', description: 'ベクトルを逆順に ( vec -- vec\' )' },
         { name: 'NTH', description: 'N番目の要素を取得（負数は末尾から） ( n vec -- elem )' },
         { name: 'UNCONS', description: 'ベクトルを先頭要素と残りに分解 ( vec -- elem vec\' )' },
