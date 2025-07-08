@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
-use web_sys::console; // この行を追加
 use crate::types::*;
-use crate.tokenizer::*;
+use crate::tokenizer::*;
 use crate::builtins;
 
 pub struct Interpreter {
@@ -83,14 +82,12 @@ impl Interpreter {
                     i += consumed - 1;
                 },
                 Token::Symbol(name) => {
-                    let log_message = format!("Processing symbol: '{}'", name);
-                    console::log_1(&log_message.into());
-
+                    // ★★ここを修正★★
+                    // 1. 演算子かどうかを最優先でチェック
                     if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
-                        console::log_1(&"  -> Matched as operator".into());
                         self.execute_operator(name)?;
+                    // 2. 次に、辞書に登録されたワード（組み込み or カスタム）かチェック
                     } else if let Some(def) = self.dictionary.get(name).cloned() {
-                        console::log_1(&"  -> Matched in dictionary".into());
                         if def.is_builtin {
                             if name == "DEF" {
                                 let desc = pending_description.take();
@@ -101,8 +98,8 @@ impl Interpreter {
                         } else {
                             self.execute_tokens_with_context(&def.tokens)?;
                         }
+                    // 3. 上記のいずれでもなければ、未知のワードとしてエラー
                     } else {
-                        console::log_1(&"  -> Unknown word".into());
                         return Err(format!("Unknown word: {}", name));
                     }
                 },
