@@ -30,6 +30,7 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     // 制御構造
     register_builtin(dictionary, "DEF", "新しいワードを定義 ( vec str -- )");
     register_builtin(dictionary, "IF", "条件分岐 ( bool vec vec -- ... )");
+    register_builtin(dictionary, "APPEND", "要素をベクトルの末尾に追加 ( vec elem -- vec' )");
     
     // 辞書操作
     register_builtin(dictionary, "DEL", "カスタムワードを削除 ( str -- )");
