@@ -69,6 +69,11 @@ jobs:
           # コミット
           git commit -m "Add WASM build artifacts [skip ci]"
           
+          # ★★★ ここを修正 ★★★
+          # pushする前にリモートの変更を取り込む
+          # コンフリクトを避けるためrebase戦略を使用
+          git pull --rebase origin main
+          
           # プッシュ
           git push origin main
         fi
