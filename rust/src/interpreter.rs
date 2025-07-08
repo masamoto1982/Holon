@@ -75,7 +75,6 @@ impl Interpreter {
                     });
                 },
                 Token::VectorStart => {
-                    // ★★ここを修正★★
                     // 常に新しいインタプリタでVectorの中身だけを評価し、結果のスタックをVectorとして積む
                     let (vector_body, consumed) = self.collect_vector(&tokens[i..])?;
                     
