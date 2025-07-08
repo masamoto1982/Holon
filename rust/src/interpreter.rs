@@ -10,7 +10,7 @@ pub struct Interpreter {
     dependencies: HashMap<String, HashSet<String>>, // word -> それを使用しているワードのセット
 }
 
-#[derive(Clone)] // Cloneを追加
+#[derive(Clone)]
 pub struct WordDefinition {
     pub tokens: Vec<Token>,
     pub is_builtin: bool,
@@ -26,7 +26,6 @@ impl Interpreter {
             dependencies: HashMap::new(),
         };
         
-        // 組み込みワードを登録
         builtins::register_builtins(&mut interpreter.dictionary);
         
         interpreter
@@ -34,25 +33,18 @@ impl Interpreter {
     
     pub fn execute(&mut self, code: &str) -> Result<(), String> {
         let tokens = tokenize(code)?;
-        self.execute_tokens_with_context(&tokens, false)?;
+        self.execute_tokens_with_context(&tokens)?;
         Ok(())
     }
     
-    // このメソッドを削除
-    // pub fn execute_tokens(&mut self, tokens: &[Token]) -> Result<(), String> {
-    //     self.execute_tokens_with_context(tokens, false)
-    // }
-    
-    fn execute_tokens_with_context(&mut self, tokens: &[Token], in_vector: bool) -> Result<(), String> {
+    fn execute_tokens_with_context(&mut self, tokens: &[Token]) -> Result<(), String> {
         let mut i = 0;
         let mut pending_description: Option<String> = None;
 
         while i < tokens.len() {
             match &tokens[i] {
                 Token::Description(text) => {
-                    if !in_vector { // `in_vector`の時も説明を保持すべきか要検討
-                        pending_description = Some(text.clone());
-                    }
+                    pending_description = Some(text.clone());
                 },
                 Token::Number(num, den) => {
                     self.stack.push(Value {
@@ -75,57 +67,44 @@ impl Interpreter {
                     });
                 },
                 Token::VectorStart => {
-                    // 常に新しいインタプリタでVectorの中身だけを評価し、結果のスタックをVectorとして積む
                     let (vector_body, consumed) = self.collect_vector(&tokens[i..])?;
                     
-                    // 新しいインタプリタインスタンスを作成してVector内を評価
                     let mut temp_interpreter = Interpreter::new();
-                    // 現在の辞書を引き継ぐ
                     temp_interpreter.dictionary = self.dictionary.clone();
                     temp_interpreter.dependencies = self.dependencies.clone();
 
-                    temp_interpreter.execute_tokens_with_context(&vector_body, false)?; // Vector内はトップレベルコンテキストとして評価
+                    temp_interpreter.execute_tokens_with_context(&vector_body)?;
                     
-                    // 結果のスタックをVectorとして現在のスタックに積む
                     self.stack.push(Value {
                         val_type: ValueType::Vector(temp_interpreter.stack),
                     });
                     
-                    i += consumed - 1; // 消費した分インデックスを進める
+                    i += consumed - 1;
                 },
                 Token::Symbol(name) => {
-                     if in_vector {
-                        self.stack.push(Value {
-                            val_type: ValueType::Symbol(name.clone()),
-                        });
-                    } else {
-                        // 通常のコンテキストでは実行
-                        if let Some(def) = self.dictionary.get(name).cloned() {
-                            if def.is_builtin {
-                                // `DEF`の特別扱い
-                                if name == "DEF" {
-                                    let desc = pending_description.take();
-                                    self.op_def_with_comment(desc)?;
-                                } else {
-                                    self.execute_builtin(name)?;
-                                }
+                    // ★★ここを修正★★
+                    // 1. 演算子かどうかを最優先でチェック
+                    if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
+                        self.execute_operator(name)?;
+                    // 2. 次に、辞書に登録されたワード（組み込み or カスタム）かチェック
+                    } else if let Some(def) = self.dictionary.get(name).cloned() {
+                        if def.is_builtin {
+                            if name == "DEF" {
+                                let desc = pending_description.take();
+                                self.op_def_with_comment(desc)?;
                             } else {
-                                // ユーザー定義ワードを実行
-                                self.execute_tokens_with_context(&def.tokens, false)?;
+                                self.execute_builtin(name)?;
                             }
-                        } else if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
-                            self.execute_operator(name)?;
                         } else {
-                            return Err(format!("Unknown word: {}", name));
+                            self.execute_tokens_with_context(&def.tokens)?;
                         }
+                    // 3. 上記のいずれでもなければ、未知のワードとしてエラー
+                    } else {
+                        return Err(format!("Unknown word: {}", name));
                     }
                 },
-                Token::VectorEnd => {
-                    // トップレベルで ']' が現れた場合はエラー
-                    if !in_vector {
-                        return Err("Unexpected ']' found outside of a vector definition.".to_string());
-                    }
-                }
+                // `collect_vector`が正しく機能していれば、トップレベルで VectorEnd が現れることはない
+                Token::VectorEnd => return Err("Unexpected ']' found.".to_string()),
             }
             
             i += 1;
@@ -134,7 +113,6 @@ impl Interpreter {
         Ok(())
     }
 
-    /// ワードのボディ(Valueのベクター)をトークン列と依存ワードのセットに変換する
     fn body_vector_to_tokens(
         &self,
         body: &[Value],
@@ -149,7 +127,6 @@ impl Interpreter {
         Ok((tokens, dependencies))
     }
 
-    /// value_to_tokensの再帰的な実装
     fn value_to_tokens_recursive(
         &self,
         val: &Value,
@@ -183,7 +160,7 @@ impl Interpreter {
     fn collect_vector(&self, tokens: &[Token]) -> Result<(Vec<Token>, usize), String> {
         let mut vector_tokens = Vec::new();
         let mut depth = 0;
-        let mut i = 1; // Skip the opening [
+        let mut i = 1; 
         
         while i < tokens.len() {
             match &tokens[i] {
@@ -236,6 +213,21 @@ impl Interpreter {
         }
     }
     
+    fn execute_operator(&mut self, op: &str) -> Result<(), String> {
+        match op {
+            "+" => self.op_add(),
+            "-" => self.op_sub(),
+            "*" => self.op_mul(),
+            "/" => self.op_div(),
+            ">" => self.op_gt(),
+            ">=" => self.op_ge(),
+            "=" => self.op_eq(),
+            "<" => self.op_lt(),
+            "<=" => self.op_le(),
+            _ => Err(format!("Unknown operator: {}", op)),
+        }
+    }
+    
     fn op_def_with_comment(&mut self, description: Option<String>) -> Result<(), String> {
         if self.stack.len() < 2 {
             return Err("Stack underflow for DEF".to_string());
@@ -267,7 +259,13 @@ impl Interpreter {
                     }
     
                     if let Some(old_def) = self.dictionary.get(&name) {
-                        let old_deps = Self::collect_dependencies(&old_def.tokens);
+                        let mut old_deps = HashSet::new();
+                        for token in &old_def.tokens {
+                           if let Token::Symbol(s) = token {
+                               old_deps.insert(s.clone());
+                           }
+                        }
+
                         for dep in old_deps {
                             if let Some(deps) = self.dependencies.get_mut(&dep) {
                                 deps.remove(&name);
@@ -297,31 +295,6 @@ impl Interpreter {
         }
     }
 
-    fn execute_operator(&mut self, op: &str) -> Result<(), String> {
-        match op {
-            "+" => self.op_add(),
-            "-" => self.op_sub(),
-            "*" => self.op_mul(),
-            "/" => self.op_div(),
-            ">" => self.op_gt(),
-            ">=" => self.op_ge(),
-            "=" => self.op_eq(),
-            "<" => self.op_lt(),
-            "<=" => self.op_le(),
-            _ => Err(format!("Unknown operator: {}", op)),
-        }
-    }
-    
-    fn collect_dependencies(tokens: &[Token]) -> HashSet<String> {
-        let mut deps = HashSet::new();
-        for token in tokens {
-            if let Token::Symbol(name) = token {
-                deps.insert(name.clone());
-            }
-        }
-        deps
-    }
-    
     pub fn delete_word(&mut self, name: &str) -> Result<(), String> {
         if let Some(def) = self.dictionary.get(name) {
             if def.is_builtin {
@@ -517,6 +490,7 @@ impl Interpreter {
             (ValueType::Boolean(b1), ValueType::Boolean(b2)) => b1 == b2,
             (ValueType::Symbol(s1), ValueType::Symbol(s2)) => s1 == s2,
             (ValueType::Nil, ValueType::Nil) => true,
+            (ValueType::Vector(v1), ValueType::Vector(v2)) => v1 == v2,
             _ => false,
         };
         self.stack.push(Value { val_type: ValueType::Boolean(result) });
@@ -529,7 +503,7 @@ impl Interpreter {
         let a = self.stack.pop().unwrap();
         match (&a.val_type, &b.val_type) {
             (ValueType::Number(n1), ValueType::Number(n2)) => {
-                self.stack.push(Value { val_type: ValueType::Boolean(n2.gt(n1)) });
+                self.stack.push(Value { val_type: ValueType::Boolean(n1.lt(n2)) });
                 Ok(())
             },
             _ => Err("Type error: < requires two numbers".to_string()),
@@ -542,7 +516,7 @@ impl Interpreter {
         let a = self.stack.pop().unwrap();
         match (&a.val_type, &b.val_type) {
             (ValueType::Number(n1), ValueType::Number(n2)) => {
-                self.stack.push(Value { val_type: ValueType::Boolean(n2.ge(n1)) });
+                self.stack.push(Value { val_type: ValueType::Boolean(n1.le(n2)) });
                 Ok(())
             },
             _ => Err("Type error: <= requires two numbers".to_string()),
@@ -683,7 +657,10 @@ impl Interpreter {
         if let Some(val) = self.stack.pop() {
             match val.val_type {
                 ValueType::Vector(v) => {
-                    for item in v { self.stack.push(item); }
+                    for item in v { 
+                        // EACHはVectorの中身を評価せずにそのまま積む
+                        self.stack.push(item);
+                    }
                     Ok(())
                 },
                 _ => Err("Type error: EACH requires a vector".to_string()),
@@ -707,7 +684,6 @@ impl Interpreter {
         }
     }
     
-    // rust/src/interpreter.rs の op_if 関数を修正
     fn op_if(&mut self) -> Result<(), String> {
         if self.stack.len() < 3 {
             return Err("Stack underflow for IF".to_string());
@@ -718,28 +694,23 @@ impl Interpreter {
         let condition = self.stack.pop().unwrap();
         
         match (&condition.val_type, &then_branch.val_type, &else_branch.val_type) {
-            (ValueType::Boolean(cond), ValueType::Vector(then_tokens), ValueType::Vector(else_tokens)) => {
-                let tokens_to_execute = if *cond { then_tokens } else { else_tokens };
+            (ValueType::Boolean(cond), ValueType::Vector(then_vec), ValueType::Vector(else_vec)) => {
+                let vec_to_execute = if *cond { then_vec } else { else_vec };
                 
-                // ベクトルの内容をトークンに変換して実行
-                let (tokens, _) = self.body_vector_to_tokens(tokens_to_execute)?;
+                let (tokens, _) = self.body_vector_to_tokens(vec_to_execute)?;
                 
-                // トークンを実行
-                self.execute_tokens_with_context(&tokens, false)?;
+                self.execute_tokens_with_context(&tokens)?;
                 Ok(())
             },
             _ => Err("Type error: IF requires a boolean and two vectors".to_string()),
         }
     }
-    
-    // 論理演算子
+
     fn op_not(&mut self) -> Result<(), String> {
         if let Some(val) = self.stack.pop() {
             match val.val_type {
                 ValueType::Boolean(b) => {
-                    self.stack.push(Value {
-                        val_type: ValueType::Boolean(!b),
-                    });
+                    self.stack.push(Value { val_type: ValueType::Boolean(!b) });
                     Ok(())
                 },
                 _ => Err("Type error: NOT requires a boolean".to_string()),
@@ -749,13 +720,10 @@ impl Interpreter {
         }
     }
     
-    
-    // DEL命令の実装
     fn op_del(&mut self) -> Result<(), String> {
         if let Some(val) = self.stack.pop() {
             match val.val_type {
                 ValueType::String(name) => {
-                    // ワード名を大文字に正規化
                     self.delete_word(&name.to_uppercase())
                 },
                 _ => Err("Type error: DEL requires a string".to_string()),
@@ -765,14 +733,9 @@ impl Interpreter {
         }
     }
     
-    // Public methods for WASM interface
-    pub fn get_stack(&self) -> &Stack {
-        &self.stack
-    }
+    pub fn get_stack(&self) -> &Stack { &self.stack }
     
-    pub fn get_register(&self) -> &Register {
-        &self.register
-    }
+    pub fn get_register(&self) -> &Register { &self.register }
     
     pub fn get_custom_words(&self) -> Vec<String> {
         let mut words: Vec<String> = self.dictionary
@@ -784,7 +747,6 @@ impl Interpreter {
         words
     }
     
-    // カスタムワードを説明付きで取得
    pub fn get_custom_words_with_descriptions(&self) -> Vec<(String, Option<String>)> {
        let mut words: Vec<(String, Option<String>)> = self.dictionary
            .iter()
@@ -795,30 +757,17 @@ impl Interpreter {
        words
    }
    
-   // カスタムワードの情報を取得（保護状態を含む）
    pub fn get_custom_words_info(&self) -> Vec<(String, Option<String>, bool)> {
        let mut words: Vec<(String, Option<String>, bool)> = self.dictionary
            .iter()
            .filter(|(_, def)| !def.is_builtin)
            .map(|(name, def)| {
-               // このワードが他のワードから依存されているかチェック
                let is_protected = self.dependencies.get(name)
-                   .map(|deps| !deps.is_empty())
-                   .unwrap_or(false);
-               
+                   .map_or(false, |deps| !deps.is_empty());
                (name.clone(), def.description.clone(), is_protected)
            })
            .collect();
        words.sort_by(|a, b| a.0.cmp(&b.0));
        words
-   }
-   
-   // 依存関係情報を取得
-   pub fn get_dependencies(&self, word: &str) -> Vec<String> {
-       if let Some(deps) = self.dependencies.get(word) {
-           deps.iter().cloned().collect()
-       } else {
-           Vec::new()
-       }
    }
 }
