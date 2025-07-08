@@ -19,6 +19,7 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     register_builtin(dictionary, "HEAD", "最初の要素 ( vec -- elem )");
     register_builtin(dictionary, "TAIL", "最初以外の要素 ( vec -- vec' )");
     register_builtin(dictionary, "CONS", "要素を先頭に追加 ( elem vec -- vec' )");
+    register_builtin(dictionary, "APPEND", "要素をベクトルの末尾に追加 ( vec elem -- vec' )");
     register_builtin(dictionary, "REVERSE", "ベクトルを逆順に ( vec -- vec' )");
     register_builtin(dictionary, "NTH", "N番目の要素を取得（負数は末尾から） ( n vec -- elem )");
     
@@ -30,7 +31,6 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     // 制御構造
     register_builtin(dictionary, "DEF", "新しいワードを定義 ( vec str -- )");
     register_builtin(dictionary, "IF", "条件分岐 ( bool vec vec -- ... )");
-    register_builtin(dictionary, "APPEND", "要素をベクトルの末尾に追加 ( vec elem -- vec' )");
     
     // 辞書操作
     register_builtin(dictionary, "DEL", "カスタムワードを削除 ( str -- )");
