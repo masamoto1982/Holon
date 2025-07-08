@@ -210,6 +210,7 @@ impl Interpreter {
             "HEAD" => self.op_head()?,
             "TAIL" => self.op_tail()?,
             "CONS" => self.op_cons()?,
+            "APPEND" => self.op_append()?,
             "REVERSE" => self.op_reverse()?,
             "NTH" => self.op_nth()?,
             "UNCONS" => self.op_uncons()?,
@@ -623,6 +624,26 @@ impl Interpreter {
             _ => Err("Type error: CONS requires an element and a vector".to_string()),
         }
     }
+
+    fn op_append(&mut self) -> Result<(), String> {
+    if self.stack.len() < 2 {
+        return Err("Stack underflow".to_string());
+    }
+    
+    let elem = self.stack.pop().unwrap();
+    let vec = self.stack.pop().unwrap();
+    
+    match vec.val_type {
+        ValueType::Vector(mut v) => {
+            v.push(elem);
+            self.stack.push(Value {
+                val_type: ValueType::Vector(v),
+            });
+            Ok(())
+        },
+        _ => Err("Type error: APPEND requires a vector and an element".to_string()),
+    }
+}
     
     fn op_reverse(&mut self) -> Result<(), String> {
         if let Some(val) = self.stack.pop() {
@@ -895,25 +916,6 @@ fn value_to_token(&self, val: &Value, tokens: &mut Vec<Token>) -> Result<(), Str
         }
     }
     Ok(())
-}
-    fn op_append(&mut self) -> Result<(), String> {
-    if self.stack.len() < 2 {
-        return Err("Stack underflow".to_string());
-    }
-    
-    let elem = self.stack.pop().unwrap();
-    let vec = self.stack.pop().unwrap();
-    
-    match vec.val_type {
-        ValueType::Vector(mut v) => {
-            v.push(elem);
-            self.stack.push(Value {
-                val_type: ValueType::Vector(v),
-            });
-            Ok(())
-        },
-        _ => Err("Type error: APPEND requires a vector and an element".to_string()),
-    }
 }
     
     // 論理演算子
