@@ -863,69 +863,75 @@ impl Interpreter {
     }
     
     fn op_case(&mut self) -> Result<(), String> {
-        if self.stack.len() < 2 {
-            return Err("Stack underflow for CASE".to_string());
-        }
-        
-        let cases_val = self.stack.pop().unwrap();
-        let test_val = self.stack.pop().unwrap();
-        
-        match &cases_val.val_type {
-            ValueType::Vector(cases) => {
-                // 各ケースをチェック
-                for case in cases {
-                    match &case.val_type {
-                        ValueType::Vector(case_pair) => {
-                            if case_pair.len() != 2 {
-                                return Err("CASE: each case must be a pair [condition action]".to_string());
-                            }
-                            
-                            // 条件部分を評価
-                            match &case_pair[0].val_type {
-                                ValueType::Vector(cond_proc) => {
-                                    // テスト値をスタックに戻す
-                                    self.stack.push(test_val.clone());
-                                    
-                                    // 条件を評価
-                                    let (cond_tokens, _) = self.body_vector_to_tokens(cond_proc)?;
-                                    self.execute_tokens_with_context(&cond_tokens)?;
-                                    
-                                    // 結果を取得
-                                    if let Some(result) = self.stack.pop() {
-                                        match result.val_type {
-                                            ValueType::Boolean(true) => {
-                                                // アクション部分を実行
-                                                match &case_pair[1].val_type {
-                                                    ValueType::Vector(action) => {
-                                                        let (action_tokens, _) = self.body_vector_to_tokens(action)?;
-                                                        self.execute_tokens_with_context(&action_tokens)?;
-                                                        return Ok(());
-                                                    },
-                                                    _ => return Err("CASE: action must be a vector".to_string()),
-                                                }
-                                            },
-                                            ValueType::Boolean(false) => {
-                                                // 次のケースへ
-                                            },
-                                            _ => return Err("CASE: condition must produce a boolean".to_string()),
-                                        }
-                                    } else {
-                                        return Err("CASE: condition produced no result".to_string());
+    if self.stack.len() < 2 {
+        return Err("Stack underflow for CASE".to_string());
+    }
+    
+    let cases_val = self.stack.pop().unwrap();
+    let test_val = self.stack.pop().unwrap();
+    
+    match &cases_val.val_type {
+        ValueType::Vector(cases) => {
+            let mut matched = false; // マッチしたかどうかのフラグ
+            for case in cases {
+                match &case.val_type {
+                    ValueType::Vector(case_pair) => {
+                        if case_pair.len() != 2 {
+                            return Err("CASE: each case must be a pair [condition action]".to_string());
+                        }
+                        
+                        match &case_pair[0].val_type {
+                            ValueType::Vector(cond_proc) => {
+                                self.stack.push(test_val.clone());
+                                
+                                let (cond_tokens, _) = self.body_vector_to_tokens(cond_proc)?;
+                                self.execute_tokens_with_context(&cond_tokens)?;
+                                
+                                if let Some(result) = self.stack.pop() {
+                                    match result.val_type {
+                                        ValueType::Boolean(true) => {
+                                            match &case_pair[1].val_type {
+                                                ValueType::Vector(action) => {
+                                                    let (action_tokens, _) = self.body_vector_to_tokens(action)?;
+                                                    self.execute_tokens_with_context(&action_tokens)?;
+                                                    matched = true;
+                                                    break; // マッチしたらループを抜ける
+                                                },
+                                                _ => return Err("CASE: action must be a vector".to_string()),
+                                            }
+                                        },
+                                        ValueType::Boolean(false) => {
+                                            // 何もしない
+                                        },
+                                        _ => return Err("CASE: condition must produce a boolean".to_string()),
                                     }
-                                },
-                                _ => return Err("CASE: condition must be a vector".to_string()),
-                            }
-                        },
-                        _ => return Err("CASE: each case must be a vector".to_string()),
+                                } else {
+                                    return Err("CASE: condition produced no result".to_string());
+                                }
+                            },
+                            _ => return Err("CASE: condition must be a vector".to_string()),
+                        }
+                    },
+                    _ => return Err("CASE: each case must be a vector".to_string()),
+                }
+            }
+
+            // ★★★ 修正箇所 ★★★
+            // どのケースにもマッチしなかった場合、スタックに残った値を削除
+            if !matched {
+                // スタックのトップがテスト値と同じなら削除
+                if let Some(top) = self.stack.last() {
+                    if *top == test_val {
+                        self.stack.pop();
                     }
                 }
-                
-                // どのケースにもマッチしなかった場合、テスト値を削除
-                Ok(())
-            },
-            _ => Err("Type error: CASE requires a value and a vector of cases".to_string()),
-        }
+            }
+            
+            Ok(())
+        },
+        _ => Err("Type error: CASE requires a value and a vector of cases".to_string()),
     }
+}
     
     pub fn get_stack(&self) -> &Stack { &self.stack }
     
