@@ -209,6 +209,11 @@ impl Interpreter {
             "EMPTY?" => self.op_empty(),
             "DEL" => self.op_del(),
             "NOT" => self.op_not(),
+            "MAP" => self.op_map(),
+            "WHEN" => self.op_when(),
+            "UNLESS" => self.op_unless(),
+            "LOOP" => self.op_loop(),
+            "CASE" => self.op_case(),
             _ => Err(format!("Unknown builtin: {}", name)),
         }
     }
@@ -730,6 +735,195 @@ impl Interpreter {
             }
         } else {
             Err("Stack underflow".to_string())
+        }
+    }
+    
+    // 新しい制御構造の実装
+    
+    fn op_map(&mut self) -> Result<(), String> {
+        if self.stack.len() < 2 {
+            return Err("Stack underflow for MAP".to_string());
+        }
+        
+        let proc_val = self.stack.pop().unwrap();
+        let vec_val = self.stack.pop().unwrap();
+        
+        match (&vec_val.val_type, &proc_val.val_type) {
+            (ValueType::Vector(vec), ValueType::Vector(proc)) => {
+                let mut result = Vec::new();
+                
+                // 各要素に対して処理を実行
+                for item in vec {
+                    // 要素をスタックに積む
+                    self.stack.push(item.clone());
+                    
+                    // 処理を実行
+                    let (tokens, _) = self.body_vector_to_tokens(proc)?;
+                    self.execute_tokens_with_context(&tokens)?;
+                    
+                    // 結果を取得
+                    if let Some(result_val) = self.stack.pop() {
+                        result.push(result_val);
+                    } else {
+                        return Err("MAP: procedure produced no result".to_string());
+                    }
+                }
+                
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            _ => Err("Type error: MAP requires a vector and a procedure vector".to_string()),
+        }
+    }
+    
+    fn op_when(&mut self) -> Result<(), String> {
+        if self.stack.len() < 2 {
+            return Err("Stack underflow for WHEN".to_string());
+        }
+        
+        let proc_val = self.stack.pop().unwrap();
+        let cond_val = self.stack.pop().unwrap();
+        
+        match (&cond_val.val_type, &proc_val.val_type) {
+            (ValueType::Boolean(cond), ValueType::Vector(proc)) => {
+                if *cond {
+                    let (tokens, _) = self.body_vector_to_tokens(proc)?;
+                    self.execute_tokens_with_context(&tokens)?;
+                }
+                Ok(())
+            },
+            _ => Err("Type error: WHEN requires a boolean and a procedure vector".to_string()),
+        }
+    }
+    
+    fn op_unless(&mut self) -> Result<(), String> {
+        if self.stack.len() < 2 {
+            return Err("Stack underflow for UNLESS".to_string());
+        }
+        
+        let proc_val = self.stack.pop().unwrap();
+        let cond_val = self.stack.pop().unwrap();
+        
+        match (&cond_val.val_type, &proc_val.val_type) {
+            (ValueType::Boolean(cond), ValueType::Vector(proc)) => {
+                if !*cond {
+                    let (tokens, _) = self.body_vector_to_tokens(proc)?;
+                    self.execute_tokens_with_context(&tokens)?;
+                }
+                Ok(())
+            },
+            _ => Err("Type error: UNLESS requires a boolean and a procedure vector".to_string()),
+        }
+    }
+    
+    fn op_loop(&mut self) -> Result<(), String> {
+        if self.stack.len() < 2 {
+            return Err("Stack underflow for LOOP".to_string());
+        }
+        
+        let body_val = self.stack.pop().unwrap();
+        let cond_val = self.stack.pop().unwrap();
+        
+        match (&cond_val.val_type, &body_val.val_type) {
+            (ValueType::Vector(cond), ValueType::Vector(body)) => {
+                // 安全のため、無限ループ防止の上限を設定
+                let mut iterations = 0;
+                const MAX_ITERATIONS: usize = 10000;
+                
+                loop {
+                    // 条件を評価
+                    let (cond_tokens, _) = self.body_vector_to_tokens(cond)?;
+                    self.execute_tokens_with_context(&cond_tokens)?;
+                    
+                    // 条件の結果を取得
+                    if let Some(result) = self.stack.pop() {
+                        match result.val_type {
+                            ValueType::Boolean(false) => break,
+                            ValueType::Boolean(true) => {
+                                // 本体を実行
+                                let (body_tokens, _) = self.body_vector_to_tokens(body)?;
+                                self.execute_tokens_with_context(&body_tokens)?;
+                                
+                                iterations += 1;
+                                if iterations > MAX_ITERATIONS {
+                                    return Err("LOOP: Maximum iterations exceeded".to_string());
+                                }
+                            },
+                            _ => return Err("LOOP: condition must produce a boolean".to_string()),
+                        }
+                    } else {
+                        return Err("LOOP: condition produced no result".to_string());
+                    }
+                }
+                
+                Ok(())
+            },
+            _ => Err("Type error: LOOP requires two procedure vectors".to_string()),
+        }
+    }
+    
+    fn op_case(&mut self) -> Result<(), String> {
+        if self.stack.len() < 2 {
+            return Err("Stack underflow for CASE".to_string());
+        }
+        
+        let cases_val = self.stack.pop().unwrap();
+        let test_val = self.stack.pop().unwrap();
+        
+        match &cases_val.val_type {
+            ValueType::Vector(cases) => {
+                // 各ケースをチェック
+                for case in cases {
+                    match &case.val_type {
+                        ValueType::Vector(case_pair) => {
+                            if case_pair.len() != 2 {
+                                return Err("CASE: each case must be a pair [condition action]".to_string());
+                            }
+                            
+                            // 条件部分を評価
+                            match &case_pair[0].val_type {
+                                ValueType::Vector(cond_proc) => {
+                                    // テスト値をスタックに戻す
+                                    self.stack.push(test_val.clone());
+                                    
+                                    // 条件を評価
+                                    let (cond_tokens, _) = self.body_vector_to_tokens(cond_proc)?;
+                                    self.execute_tokens_with_context(&cond_tokens)?;
+                                    
+                                    // 結果を取得
+                                    if let Some(result) = self.stack.pop() {
+                                        match result.val_type {
+                                            ValueType::Boolean(true) => {
+                                                // アクション部分を実行
+                                                match &case_pair[1].val_type {
+                                                    ValueType::Vector(action) => {
+                                                        let (action_tokens, _) = self.body_vector_to_tokens(action)?;
+                                                        self.execute_tokens_with_context(&action_tokens)?;
+                                                        return Ok(());
+                                                    },
+                                                    _ => return Err("CASE: action must be a vector".to_string()),
+                                                }
+                                            },
+                                            ValueType::Boolean(false) => {
+                                                // 次のケースへ
+                                            },
+                                            _ => return Err("CASE: condition must produce a boolean".to_string()),
+                                        }
+                                    } else {
+                                        return Err("CASE: condition produced no result".to_string());
+                                    }
+                                },
+                                _ => return Err("CASE: condition must be a vector".to_string()),
+                            }
+                        },
+                        _ => return Err("CASE: each case must be a vector".to_string()),
+                    }
+                }
+                
+                // どのケースにもマッチしなかった場合、テスト値を削除
+                Ok(())
+            },
+            _ => Err("Type error: CASE requires a value and a vector of cases".to_string()),
         }
     }
     
