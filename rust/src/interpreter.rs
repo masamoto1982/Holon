@@ -862,7 +862,9 @@ impl Interpreter {
         }
     }
     
-    fn op_case(&mut self) -> Result<(), String> {
+    // rust/src/interpreter.rs の op_case 関数を修正
+
+fn op_case(&mut self) -> Result<(), String> {
     if self.stack.len() < 2 {
         return Err("Stack underflow for CASE".to_string());
     }
@@ -872,7 +874,7 @@ impl Interpreter {
     
     match &cases_val.val_type {
         ValueType::Vector(cases) => {
-            let mut matched = false; // マッチしたかどうかのフラグ
+            let mut matched = false; // ★ マッチしたかどうかのフラグを追加
             for case in cases {
                 match &case.val_type {
                     ValueType::Vector(case_pair) => {
@@ -880,28 +882,33 @@ impl Interpreter {
                             return Err("CASE: each case must be a pair [condition action]".to_string());
                         }
                         
+                        // 条件部分を評価
                         match &case_pair[0].val_type {
                             ValueType::Vector(cond_proc) => {
+                                // テスト値をスタックにプッシュ
                                 self.stack.push(test_val.clone());
                                 
+                                // 条件を評価
                                 let (cond_tokens, _) = self.body_vector_to_tokens(cond_proc)?;
                                 self.execute_tokens_with_context(&cond_tokens)?;
                                 
+                                // 結果を取得
                                 if let Some(result) = self.stack.pop() {
                                     match result.val_type {
                                         ValueType::Boolean(true) => {
+                                            // アクション部分を実行
                                             match &case_pair[1].val_type {
                                                 ValueType::Vector(action) => {
                                                     let (action_tokens, _) = self.body_vector_to_tokens(action)?;
                                                     self.execute_tokens_with_context(&action_tokens)?;
-                                                    matched = true;
-                                                    break; // マッチしたらループを抜ける
+                                                    matched = true; // ★ マッチしたことを記録
+                                                    return Ok(()); // ★ マッチしたら即座に終了
                                                 },
                                                 _ => return Err("CASE: action must be a vector".to_string()),
                                             }
                                         },
                                         ValueType::Boolean(false) => {
-                                            // 何もしない
+                                            // 次のケースへ
                                         },
                                         _ => return Err("CASE: condition must produce a boolean".to_string()),
                                     }
@@ -915,17 +922,13 @@ impl Interpreter {
                     _ => return Err("CASE: each case must be a vector".to_string()),
                 }
             }
-
+            
             // ★★★ 修正箇所 ★★★
-            // どのケースにもマッチしなかった場合、スタックに残った値を削除
-            if !matched {
-                // スタックのトップがテスト値と同じなら削除
-                if let Some(top) = self.stack.last() {
-                    if *top == test_val {
-                        self.stack.pop();
-                    }
-                }
-            }
+            // どのケースにもマッチしなかった場合、テスト値はスタックに残ってしまうので何もしない。
+            // ユーザーがデフォルトケース `[ [ DROP true ] [ ... ] ]` を提供することで
+            // 値を消費するかどうかを制御できるようにする。
+            // この修正により、もしどのケースにもマッチしない場合、`test_val`はスタックに残り続けるが、
+            // これはユーザーがデフォルトケースで `DROP` を使って制御すべき挙動となる。
             
             Ok(())
         },
