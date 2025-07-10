@@ -99,7 +99,6 @@ impl Interpreter {
                     });
                 },
                 Token::VectorStart => {
-                    // ★★ここが最大の変更点★★
                     // ベクタを「データ」として解析し、スタックに積む
                     let (vector_values, consumed) = self.collect_vector_as_data(&tokens[i..])?;
                     self.stack.push(Value {
@@ -108,7 +107,7 @@ impl Interpreter {
                     i += consumed - 1; // インデックスを調整
                 },
                 Token::Symbol(name) => {
-                    // シンボルの実行ロジックは従来通り
+                    // シンボルの実行ロジック
                     if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
                         self.execute_operator(name)?;
                     } else if let Some(def) = self.dictionary.get(name).cloned() {
@@ -199,7 +198,6 @@ impl Interpreter {
             "REVERSE" => self.op_reverse(),
             "NTH" => self.op_nth(),
             "UNCONS" => self.op_uncons(),
-            "EACH" => self.op_each(),
             "EMPTY?" => self.op_empty(),
             "DEL" => self.op_del(),
             "NOT" => self.op_not(),
@@ -646,24 +644,7 @@ impl Interpreter {
             Err("Stack underflow".to_string())
         }
     }
-    
-    fn op_each(&mut self) -> Result<(), String> {
-        if let Some(val) = self.stack.pop() {
-            match val.val_type {
-                ValueType::Vector(v) => {
-                    for item in v { 
-                        // EACHはVectorの中身を評価せずにそのまま積む
-                        self.stack.push(item);
-                    }
-                    Ok(())
-                },
-                _ => Err("Type error: EACH requires a vector".to_string()),
-            }
-        } else {
-            Err("Stack underflow".to_string())
-        }
-    }
-    
+        
     fn op_empty(&mut self) -> Result<(), String> {
         if let Some(val) = self.stack.pop() {
             match val.val_type {
