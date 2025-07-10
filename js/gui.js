@@ -1,6 +1,7 @@
 // GUI管理
 const GUI = {
     mode: 'input', // 'input' or 'execution'
+    stepMode: false, // ステップ実行モード
     
     // 要素の参照
     elements: {
@@ -60,11 +61,20 @@ const GUI = {
             this.elements.codeInput.value = '';
         });
         
-        // Shift+Enterでの実行
+        // Shift+Enterで通常実行、Ctrl+Enterでステップ実行
         this.elements.codeInput.addEventListener('keydown', (event) => {
-            if (event.shiftKey && event.key === 'Enter') {
-                event.preventDefault(); // デフォルトの改行を防ぐ
-                this.executeCode();
+            if (event.key === 'Enter') {
+                if (event.shiftKey) {
+                    event.preventDefault();
+                    this.executeCode();
+                } else if (event.ctrlKey) {
+                    event.preventDefault();
+                    if (!this.stepMode) {
+                        this.startStepExecution();
+                    } else {
+                        this.continueStepExecution();
+                    }
+                }
             }
         });
         
@@ -79,6 +89,91 @@ const GUI = {
         window.addEventListener('resize', () => {
             this.updateMobileView();
         });
+    },
+    
+    // ステップ実行の開始
+    async startStepExecution() {
+        const code = this.elements.codeInput.value.trim();
+        if (!code) return;
+        
+        // WASMインタープリタが利用可能か確認
+        if (!window.HolonWasm || !window.ajisaiInterpreter) {
+            if (window.HolonWasm) {
+                window.ajisaiInterpreter = new window.HolonWasm.AjisaiInterpreter();
+            } else {
+                this.elements.outputDisplay.textContent = 'Error: WASM not loaded';
+                return;
+            }
+        }
+        
+        try {
+            // ステップ実行を初期化
+            const result = window.ajisaiInterpreter.init_step(code);
+            
+            if (result === 'OK') {
+                this.stepMode = true;
+                this.elements.outputDisplay.textContent = 'Step mode: Press Ctrl+Enter to continue...';
+                
+                // 初回のステップ実行
+                this.continueStepExecution();
+            } else {
+                this.elements.outputDisplay.textContent = result;
+            }
+        } catch (error) {
+            this.elements.outputDisplay.textContent = `Error: ${error.message || error}`;
+        }
+    },
+    
+    // ステップ実行の継続
+    async continueStepExecution() {
+        if (!this.stepMode) return;
+        
+        try {
+            const stepResult = window.ajisaiInterpreter.step();
+            
+            // スタックとレジスタを更新
+            const stack = window.ajisaiInterpreter.get_stack();
+            this.updateStackDisplay(this.convertWasmStack(stack));
+            
+            const register = window.ajisaiInterpreter.get_register();
+            this.updateRegisterDisplay(this.convertWasmValue(register));
+            
+            // カスタムワードを更新
+            const customWordsInfo = window.ajisaiInterpreter.get_custom_words_info();
+            const customWordInfos = customWordsInfo.map(wordData => {
+                if (Array.isArray(wordData)) {
+                    return {
+                        name: wordData[0],
+                        description: wordData[1] || null,
+                        protected: wordData[2] || false
+                    };
+                } else {
+                    return wordData;
+                }
+            });
+            this.renderWordButtons(this.elements.customWordsDisplay, customWordInfos, true);
+            
+            // ステップ情報を表示
+            if (stepResult.hasMore) {
+                const position = stepResult.position || 0;
+                const total = stepResult.total || 0;
+                this.elements.outputDisplay.textContent = 
+                    `Step ${position}/${total}: Press Ctrl+Enter to continue...`;
+            } else {
+                // 実行完了
+                this.stepMode = false;
+                this.elements.outputDisplay.textContent = 'OK (Step execution completed)';
+                this.elements.codeInput.value = '';
+                
+                // モバイルでは実行モードに切り替え
+                if (this.isMobile()) {
+                    this.setMode('execution');
+                }
+            }
+        } catch (error) {
+            this.stepMode = false;
+            this.elements.outputDisplay.textContent = `Error: ${error.message || error}`;
+        }
     },
     
     // モバイル判定
@@ -221,6 +316,9 @@ const GUI = {
     async executeCode() {
         const code = this.elements.codeInput.value.trim();
         if (!code) return;
+        
+        // ステップモードを終了
+        this.stepMode = false;
         
         // WASMインタープリタが利用可能か確認
         if (!window.HolonWasm || !window.ajisaiInterpreter) {
