@@ -31,11 +31,6 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     // 制御構造
     register_builtin(dictionary, "DEF", "新しいワードを定義 ( vec str -- )");
     register_builtin(dictionary, "IF", "条件分岐 ( bool vec vec -- ... )");
-    register_builtin(dictionary, "MAP", "ベクトルの各要素に処理を適用 ( vec proc -- vec' )");
-    register_builtin(dictionary, "WHEN", "条件が真の時だけ処理を実行 ( bool proc -- )");
-    register_builtin(dictionary, "UNLESS", "条件が偽の時だけ処理を実行 ( bool proc -- )");
-    register_builtin(dictionary, "LOOP", "条件が真の間、処理を繰り返す ( cond-proc body-proc -- )");
-    register_builtin(dictionary, "CASE", "パターンマッチング分岐 ( value cases -- )");
     
     // 辞書操作
     register_builtin(dictionary, "DEL", "カスタムワードを削除 ( str -- )");
