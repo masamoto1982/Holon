@@ -120,172 +120,171 @@ const GUI = {
     },
     
     // 辞書の描画
-renderDictionary() {
-    // 組み込みワード（説明付き）
-    const builtinWords = [
-        { name: '+', description: '加算 ( a b -- a+b )' },
-        { name: '-', description: '減算 ( a b -- a-b )' },
-        { name: '*', description: '乗算 ( a b -- a*b )' },
-        { name: '/', description: '除算 ( a b -- a/b )' },
-        { name: '=', description: '等しい ( a b -- bool )' },
-        { name: '>', description: 'より大きい ( a b -- bool )' },
-        { name: '>=', description: '以上 ( a b -- bool )' },
-        { name: '<', description: 'より小さい ( a b -- bool )' },
-        { name: '<=', description: '以下 ( a b -- bool )' },
-        { name: 'NOT', description: '論理否定 ( bool -- bool )' },
-        { name: 'DUP', description: 'スタックトップを複製 ( a -- a a )' },
-        { name: 'DROP', description: 'スタックトップを削除 ( a -- )' },
-        { name: 'SWAP', description: '上位2つを交換 ( a b -- b a )' },
-        { name: 'OVER', description: '2番目をコピー ( a b -- a b a )' },
-        { name: 'ROT', description: '3番目を最上位へ ( a b c -- b c a )' },
-        { name: '>R', description: 'スタックからレジスタへ移動 ( a -- )' },
-        { name: 'R>', description: 'レジスタからスタックへ移動 ( -- a )' },
-        { name: 'R@', description: 'レジスタの値をコピー ( -- a )' },
-        { name: 'LENGTH', description: 'ベクトルの長さ ( vec -- n )' },
-        { name: 'HEAD', description: '最初の要素 ( vec -- elem )' },
-        { name: 'TAIL', description: '最初以外の要素 ( vec -- vec\' )' },
-        { name: 'CONS', description: '要素を先頭に追加 ( elem vec -- vec\' )' },
-        { name: 'APPEND', description: '要素を末尾に追加 ( vec elem -- vec\' )' },
-        { name: 'REVERSE', description: 'ベクトルを逆順に ( vec -- vec\' )' },
-        { name: 'NTH', description: 'N番目の要素を取得（負数は末尾から） ( n vec -- elem )' },
-        { name: 'UNCONS', description: 'ベクトルを先頭要素と残りに分解 ( vec -- elem vec\' )' },
-        { name: 'EACH', description: 'ベクトルの各要素をスタックに展開 ( vec -- elem... )' },
-        { name: 'EMPTY?', description: 'ベクトルが空かチェック ( vec -- bool )' },
-        { name: 'DEF', description: '新しいワードを定義 ( vec str -- )' },
-        { name: 'IF', description: '条件分岐 ( bool vec vec -- ... )' },
-        { name: 'DEL', description: 'カスタムワードを削除 ( str -- )' }
-    ];
-    this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords, false);
-    
-    // カスタムワードは初期状態では空
-    this.renderWordButtons(this.elements.customWordsDisplay, [], true);
-},
+    renderDictionary() {
+        // 組み込みワード（説明付き）
+        const builtinWords = [
+            { name: '+', description: '加算 ( a b -- a+b )' },
+            { name: '-', description: '減算 ( a b -- a-b )' },
+            { name: '*', description: '乗算 ( a b -- a*b )' },
+            { name: '/', description: '除算 ( a b -- a/b )' },
+            { name: '=', description: '等しい ( a b -- bool )' },
+            { name: '>', description: 'より大きい ( a b -- bool )' },
+            { name: '>=', description: '以上 ( a b -- bool )' },
+            { name: '<', description: 'より小さい ( a b -- bool )' },
+            { name: '<=', description: '以下 ( a b -- bool )' },
+            { name: 'NOT', description: '論理否定 ( bool -- bool )' },
+            { name: 'DUP', description: 'スタックトップを複製 ( a -- a a )' },
+            { name: 'DROP', description: 'スタックトップを削除 ( a -- )' },
+            { name: 'SWAP', description: '上位2つを交換 ( a b -- b a )' },
+            { name: 'OVER', description: '2番目をコピー ( a b -- a b a )' },
+            { name: 'ROT', description: '3番目を最上位へ ( a b c -- b c a )' },
+            { name: '>R', description: 'スタックからレジスタへ移動 ( a -- )' },
+            { name: 'R>', description: 'レジスタからスタックへ移動 ( -- a )' },
+            { name: 'R@', description: 'レジスタの値をコピー ( -- a )' },
+            { name: 'LENGTH', description: 'ベクトルの長さ ( vec -- n )' },
+            { name: 'HEAD', description: '最初の要素 ( vec -- elem )' },
+            { name: 'TAIL', description: '最初以外の要素 ( vec -- vec\' )' },
+            { name: 'CONS', description: '要素を先頭に追加 ( elem vec -- vec\' )' },
+            { name: 'APPEND', description: '要素を末尾に追加 ( vec elem -- vec\' )' },
+            { name: 'REVERSE', description: 'ベクトルを逆順に ( vec -- vec\' )' },
+            { name: 'NTH', description: 'N番目の要素を取得（負数は末尾から） ( n vec -- elem )' },
+            { name: 'UNCONS', description: 'ベクトルを先頭要素と残りに分解 ( vec -- elem vec\' )' },
+            { name: 'EMPTY?', description: 'ベクトルが空かチェック ( vec -- bool )' },
+            { name: 'DEF', description: '新しいワードを定義 ( vec str -- )' },
+            { name: 'IF', description: '条件分岐 ( bool vec vec -- ... )' },
+            { name: 'DEL', description: 'カスタムワードを削除 ( str -- )' }
+        ];
+        this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords, false);
+        
+        // カスタムワードは初期状態では空
+        this.renderWordButtons(this.elements.customWordsDisplay, [], true);
+    },
     
     // ワードボタンの描画
-renderWordButtons(container, words, isCustom = false) {
-    container.innerHTML = '';
-    words.forEach(wordInfo => {
-        // wordInfoは文字列またはオブジェクト
-        const word = typeof wordInfo === 'string' ? wordInfo : wordInfo.name;
-        const description = typeof wordInfo === 'object' ? wordInfo.description : null;
-        const isProtected = typeof wordInfo === 'object' ? wordInfo.protected : false;
-        
-        const button = document.createElement('button');
-        button.textContent = word;
-        button.className = 'word-button';
-        
-        // スタイルクラスを追加
-        if (!isCustom) {
-            // 組み込みワード
-            button.classList.add('builtin');
-        } else if (isProtected) {
-            // 依存されているカスタムワード
-            button.classList.add('protected');
-        } else {
-            // 通常のカスタムワード
-            button.classList.add('deletable');
-        }
-        
-        // 説明がある場合はそれを表示、なければワード名のみ
-        button.title = description || word;
-        
-        button.addEventListener('click', () => {
-            this.insertWord(word, isCustom);
+    renderWordButtons(container, words, isCustom = false) {
+        container.innerHTML = '';
+        words.forEach(wordInfo => {
+            // wordInfoは文字列またはオブジェクト
+            const word = typeof wordInfo === 'string' ? wordInfo : wordInfo.name;
+            const description = typeof wordInfo === 'object' ? wordInfo.description : null;
+            const isProtected = typeof wordInfo === 'object' ? wordInfo.protected : false;
+            
+            const button = document.createElement('button');
+            button.textContent = word;
+            button.className = 'word-button';
+            
+            // スタイルクラスを追加
+            if (!isCustom) {
+                // 組み込みワード
+                button.classList.add('builtin');
+            } else if (isProtected) {
+                // 依存されているカスタムワード
+                button.classList.add('protected');
+            } else {
+                // 通常のカスタムワード
+                button.classList.add('deletable');
+            }
+            
+            // 説明がある場合はそれを表示、なければワード名のみ
+            button.title = description || word;
+            
+            button.addEventListener('click', () => {
+                this.insertWord(word, isCustom);
+            });
+            container.appendChild(button);
         });
-        container.appendChild(button);
-    });
-},
+    },
     
     // ワードの挿入
-insertWord(word, isCustom = false) {
-    const input = this.elements.codeInput;
-    const start = input.selectionStart;
-    const end = input.selectionEnd;
-    const text = input.value;
-    
-    // カーソル位置に挿入
-    input.value = text.substring(0, start) + word + text.substring(end);
-    
-    // カーソル位置を更新
-    const newPos = start + word.length;
-    input.selectionStart = newPos;
-    input.selectionEnd = newPos;
-    
-    // フォーカスを維持
-    input.focus();
-},
+    insertWord(word, isCustom = false) {
+        const input = this.elements.codeInput;
+        const start = input.selectionStart;
+        const end = input.selectionEnd;
+        const text = input.value;
+        
+        // カーソル位置に挿入
+        input.value = text.substring(0, start) + word + text.substring(end);
+        
+        // カーソル位置を更新
+        const newPos = start + word.length;
+        input.selectionStart = newPos;
+        input.selectionEnd = newPos;
+        
+        // フォーカスを維持
+        input.focus();
+    },
     
     // executeCode関数の修正（カスタムワード情報の取得部分）
-async executeCode() {
-    const code = this.elements.codeInput.value.trim();
-    if (!code) return;
-    
-    // WASMインタープリタが利用可能か確認
-    if (!window.HolonWasm || !window.ajisaiInterpreter) {
-        // WASMが利用できない場合は初期化を試みる
-        if (window.HolonWasm) {
-            window.ajisaiInterpreter = new window.HolonWasm.AjisaiInterpreter();
-        } else {
-            this.elements.outputDisplay.textContent = 'Error: WASM not loaded';
-            return;
-        }
-    }
-    
-    try {
-        // コードを実行
-        const result = window.ajisaiInterpreter.execute(code);
+    async executeCode() {
+        const code = this.elements.codeInput.value.trim();
+        if (!code) return;
         
-        if (result === 'OK') {
-            // 成功時
-            this.elements.outputDisplay.textContent = 'OK';
-            
-            // スタックを取得して表示
-            const stack = window.ajisaiInterpreter.get_stack();
-            this.updateStackDisplay(this.convertWasmStack(stack));
-            
-            // レジスタを取得して表示
-            const register = window.ajisaiInterpreter.get_register();
-            this.updateRegisterDisplay(this.convertWasmValue(register));
-            
-            // カスタムワードを更新（説明と保護状態付き）
-const customWordsInfo = window.ajisaiInterpreter.get_custom_words_info();
-console.log('Custom words info:', customWordsInfo);
-console.log('First word data:', customWordsInfo[0]); // 最初の要素を詳しく見る
-
-const customWordInfos = customWordsInfo.map(wordData => {
-    // wordDataが配列の場合: [名前, 説明, 保護状態]
-    if (Array.isArray(wordData)) {
-        console.log('Word data array:', wordData); // 配列の中身を表示
-        const info = {
-            name: wordData[0],
-            description: wordData[1] || null,
-            protected: wordData[2] || false
-        };
-        console.log('Processed info:', info);
-        return info;
-    } else {
-        return wordData;
-    }
-});
-            this.renderWordButtons(this.elements.customWordsDisplay, customWordInfos, true);
-            
-            // 成功時はテキストエディタをクリア
-            this.elements.codeInput.value = '';
-            
-            // モバイルでは実行モードに切り替え
-            if (this.isMobile()) {
-                this.setMode('execution');
+        // WASMインタープリタが利用可能か確認
+        if (!window.HolonWasm || !window.ajisaiInterpreter) {
+            // WASMが利用できない場合は初期化を試みる
+            if (window.HolonWasm) {
+                window.ajisaiInterpreter = new window.HolonWasm.AjisaiInterpreter();
+            } else {
+                this.elements.outputDisplay.textContent = 'Error: WASM not loaded';
+                return;
             }
+        }
+        
+        try {
+            // コードを実行
+            const result = window.ajisaiInterpreter.execute(code);
+            
+            if (result === 'OK') {
+                // 成功時
+                this.elements.outputDisplay.textContent = 'OK';
+                
+                // スタックを取得して表示
+                const stack = window.ajisaiInterpreter.get_stack();
+                this.updateStackDisplay(this.convertWasmStack(stack));
+                
+                // レジスタを取得して表示
+                const register = window.ajisaiInterpreter.get_register();
+                this.updateRegisterDisplay(this.convertWasmValue(register));
+                
+                // カスタムワードを更新（説明と保護状態付き）
+    const customWordsInfo = window.ajisaiInterpreter.get_custom_words_info();
+    console.log('Custom words info:', customWordsInfo);
+    console.log('First word data:', customWordsInfo[0]); // 最初の要素を詳しく見る
+
+    const customWordInfos = customWordsInfo.map(wordData => {
+        // wordDataが配列の場合: [名前, 説明, 保護状態]
+        if (Array.isArray(wordData)) {
+            console.log('Word data array:', wordData); // 配列の中身を表示
+            const info = {
+                name: wordData[0],
+                description: wordData[1] || null,
+                protected: wordData[2] || false
+            };
+            console.log('Processed info:', info);
+            return info;
         } else {
-            // エラー時
-            this.elements.outputDisplay.textContent = result;
+            return wordData;
+        }
+    });
+                this.renderWordButtons(this.elements.customWordsDisplay, customWordInfos, true);
+                
+                // 成功時はテキストエディタをクリア
+                this.elements.codeInput.value = '';
+                
+                // モバイルでは実行モードに切り替え
+                if (this.isMobile()) {
+                    this.setMode('execution');
+                }
+            } else {
+                // エラー時
+                this.elements.outputDisplay.textContent = result;
+                // エラー時はテキストエディタの内容を保持
+            }
+        } catch (error) {
+            this.elements.outputDisplay.textContent = `Error: ${error.message || error}`;
             // エラー時はテキストエディタの内容を保持
         }
-    } catch (error) {
-        this.elements.outputDisplay.textContent = `Error: ${error.message || error}`;
-        // エラー時はテキストエディタの内容を保持
-    }
-},
+    },
     
     // WASMの値をJSの形式に変換
     convertWasmValue(wasmValue) {
