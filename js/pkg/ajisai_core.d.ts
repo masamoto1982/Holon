@@ -4,6 +4,8 @@ export class AjisaiInterpreter {
   free(): void;
   constructor();
   execute(code: string): string;
+  init_step(code: string): string;
+  step(): any;
   get_stack(): any;
   get_register(): any;
   get_custom_words(): string[];
@@ -19,6 +21,8 @@ export interface InitOutput {
   readonly __wbg_ajisaiinterpreter_free: (a: number, b: number) => void;
   readonly ajisaiinterpreter_new: () => number;
   readonly ajisaiinterpreter_execute: (a: number, b: number, c: number) => [number, number, number, number];
+  readonly ajisaiinterpreter_init_step: (a: number, b: number, c: number) => [number, number, number, number];
+  readonly ajisaiinterpreter_step: (a: number) => [number, number, number];
   readonly ajisaiinterpreter_get_stack: (a: number) => any;
   readonly ajisaiinterpreter_get_register: (a: number) => any;
   readonly ajisaiinterpreter_get_custom_words: (a: number) => [number, number];
