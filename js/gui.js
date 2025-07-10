@@ -153,11 +153,6 @@ renderDictionary() {
         { name: 'EMPTY?', description: 'ベクトルが空かチェック ( vec -- bool )' },
         { name: 'DEF', description: '新しいワードを定義 ( vec str -- )' },
         { name: 'IF', description: '条件分岐 ( bool vec vec -- ... )' },
-        { name: 'MAP', description: 'ベクトルの各要素に処理を適用 ( vec proc -- vec\' )' },
-        { name: 'WHEN', description: '条件が真の時だけ処理を実行 ( bool proc -- )' },
-        { name: 'UNLESS', description: '条件が偽の時だけ処理を実行 ( bool proc -- )' },
-        { name: 'LOOP', description: '条件が真の間、処理を繰り返す ( cond-proc body-proc -- )' },
-        { name: 'CASE', description: 'パターンマッチング分岐 ( value cases -- )' },
         { name: 'DEL', description: 'カスタムワードを削除 ( str -- )' }
     ];
     this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords, false);
