@@ -185,6 +185,7 @@ impl Interpreter {
             "SWAP" => self.op_swap(),
             "OVER" => self.op_over(),
             "ROT" => self.op_rot(),
+            "NIP" => self.op_nip(),
             ">R" => self.op_to_r(),
             "R>" => self.op_from_r(),
             "R@" => self.op_r_fetch(),
@@ -199,6 +200,8 @@ impl Interpreter {
             "NTH" => self.op_nth(),
             "UNCONS" => self.op_uncons(),
             "EMPTY?" => self.op_empty(),
+            "MAP" => self.op_map(),
+            "FOLD" => self.op_fold(),
             "DEL" => self.op_del(),
             "NOT" => self.op_not(),
             _ => Err(format!("Unknown builtin: {}", name)),
@@ -363,6 +366,16 @@ impl Interpreter {
         } else {
             let third = self.stack.remove(len - 3);
             self.stack.push(third);
+            Ok(())
+        }
+    }
+    
+    fn op_nip(&mut self) -> Result<(), String> {
+        let len = self.stack.len();
+        if len < 2 {
+            Err("Stack underflow".to_string())
+        } else {
+            self.stack.remove(len - 2);
             Ok(())
         }
     }
@@ -692,6 +705,79 @@ impl Interpreter {
             }
         } else {
             Err("Stack underflow".to_string())
+        }
+    }
+    
+    fn op_map(&mut self) -> Result<(), String> {
+        if self.stack.len() < 2 {
+            return Err("Stack underflow for MAP".to_string());
+        }
+        
+        let closure_val = self.stack.pop().unwrap();
+        let vec_val = self.stack.pop().unwrap();
+        
+        match (&vec_val.val_type, &closure_val.val_type) {
+            (ValueType::Vector(vec), ValueType::Vector(closure)) => {
+                let mut result = Vec::new();
+                
+                for element in vec {
+                    // 各要素をスタックにプッシュ
+                    self.stack.push(element.clone());
+                    
+                    // クロージャを実行
+                    let (tokens, _) = self.body_vector_to_tokens(closure)?;
+                    self.execute_tokens_with_context(&tokens)?;
+                    
+                    // 結果をスタックから取得
+                    if let Some(mapped_val) = self.stack.pop() {
+                        result.push(mapped_val);
+                    } else {
+                        return Err("MAP: closure must produce a value".to_string());
+                    }
+                }
+                
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            _ => Err("Type error: MAP requires a vector and a closure vector".to_string()),
+        }
+    }
+    
+    fn op_fold(&mut self) -> Result<(), String> {
+        if self.stack.len() < 3 {
+            return Err("Stack underflow for FOLD".to_string());
+        }
+        
+        let closure_val = self.stack.pop().unwrap();
+        let init_val = self.stack.pop().unwrap();
+        let vec_val = self.stack.pop().unwrap();
+        
+        match (&vec_val.val_type, &closure_val.val_type) {
+            (ValueType::Vector(vec), ValueType::Vector(closure)) => {
+                // 初期値をアキュムレータとして開始
+                let mut accumulator = init_val;
+                
+                for element in vec {
+                    // スタックに: accumulator element
+                    self.stack.push(accumulator);
+                    self.stack.push(element.clone());
+                    
+                    // クロージャを実行
+                    let (tokens, _) = self.body_vector_to_tokens(closure)?;
+                    self.execute_tokens_with_context(&tokens)?;
+                    
+                    // 結果を新しいアキュムレータとして取得
+                    if let Some(new_acc) = self.stack.pop() {
+                        accumulator = new_acc;
+                    } else {
+                        return Err("FOLD: closure must produce a value".to_string());
+                    }
+                }
+                
+                self.stack.push(accumulator);
+                Ok(())
+            },
+            _ => Err("Type error: FOLD requires a vector, initial value, and closure vector".to_string()),
         }
     }
     
