@@ -36,6 +36,38 @@ impl Interpreter {
         self.execute_tokens_with_context(&tokens)?;
         Ok(())
     }
+
+    /// トークンをデータとして解析し、Valueのベクタに変換する（ネスト対応）
+    fn collect_vector_as_data(&self, tokens: &[Token]) -> Result<(Vec<Value>, usize), String> {
+        let mut values = Vec::new();
+        let mut i = 1; // 開始の'['をスキップ
+
+        while i < tokens.len() {
+            match &tokens[i] {
+                Token::VectorEnd => {
+                    // ベクタの終わり
+                    return Ok((values, i + 1)); // 消費したトークン数を返す
+                },
+                Token::VectorStart => {
+                    // ネストしたベクタの開始
+                    let (nested_values, consumed) = self.collect_vector_as_data(&tokens[i..])?;
+                    values.push(Value { val_type: ValueType::Vector(nested_values) });
+                    i += consumed; // ネストしたベクタのトークンをスキップ
+                    continue;
+                },
+                // トークンを直接Valueに変換
+                Token::Number(num, den) => values.push(Value { val_type: ValueType::Number(Fraction::new(*num, *den)) }),
+                Token::String(s) => values.push(Value { val_type: ValueType::String(s.clone()) }),
+                Token::Boolean(b) => values.push(Value { val_type: ValueType::Boolean(*b) }),
+                Token::Nil => values.push(Value { val_type: ValueType::Nil }),
+                Token::Symbol(s) => values.push(Value { val_type: ValueType::Symbol(s.clone()) }),
+                Token::Description(_) => { /* 説明はVectorデータ内では無視 */ },
+            }
+            i += 1;
+        }
+
+        Err("Unclosed vector".to_string())
+    }
     
     fn execute_tokens_with_context(&mut self, tokens: &[Token]) -> Result<(), String> {
         let mut i = 0;
@@ -67,26 +99,18 @@ impl Interpreter {
                     });
                 },
                 Token::VectorStart => {
-                    let (vector_body, consumed) = self.collect_vector(&tokens[i..])?;
-                    
-                    let mut temp_interpreter = Interpreter::new();
-                    temp_interpreter.dictionary = self.dictionary.clone();
-                    temp_interpreter.dependencies = self.dependencies.clone();
-
-                    temp_interpreter.execute_tokens_with_context(&vector_body)?;
-                    
+                    // ★★ここが最大の変更点★★
+                    // ベクタを「データ」として解析し、スタックに積む
+                    let (vector_values, consumed) = self.collect_vector_as_data(&tokens[i..])?;
                     self.stack.push(Value {
-                        val_type: ValueType::Vector(temp_interpreter.stack),
+                        val_type: ValueType::Vector(vector_values),
                     });
-                    
-                    i += consumed - 1;
+                    i += consumed - 1; // インデックスを調整
                 },
                 Token::Symbol(name) => {
-                    // ★★ここを修正★★
-                    // 1. 演算子かどうかを最優先でチェック
+                    // シンボルの実行ロジックは従来通り
                     if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
                         self.execute_operator(name)?;
-                    // 2. 次に、辞書に登録されたワード（組み込み or カスタム）かチェック
                     } else if let Some(def) = self.dictionary.get(name).cloned() {
                         if def.is_builtin {
                             if name == "DEF" {
@@ -98,12 +122,10 @@ impl Interpreter {
                         } else {
                             self.execute_tokens_with_context(&def.tokens)?;
                         }
-                    // 3. 上記のいずれでもなければ、未知のワードとしてエラー
                     } else {
                         return Err(format!("Unknown word: {}", name));
                     }
                 },
-                // `collect_vector`が正しく機能していれば、トップレベルで VectorEnd が現れることはない
                 Token::VectorEnd => return Err("Unexpected ']' found.".to_string()),
             }
             
@@ -156,35 +178,7 @@ impl Interpreter {
         }
         Ok(())
     }
-    
-    fn collect_vector(&self, tokens: &[Token]) -> Result<(Vec<Token>, usize), String> {
-        let mut vector_tokens = Vec::new();
-        let mut depth = 0;
-        let mut i = 1; 
         
-        while i < tokens.len() {
-            match &tokens[i] {
-                Token::VectorStart => {
-                    depth += 1;
-                    vector_tokens.push(tokens[i].clone());
-                },
-                Token::VectorEnd => {
-                    if depth == 0 {
-                        return Ok((vector_tokens, i + 1));
-                    }
-                    depth -= 1;
-                    vector_tokens.push(tokens[i].clone());
-                },
-                _ => {
-                    vector_tokens.push(tokens[i].clone());
-                }
-            }
-            i += 1;
-        }
-        
-        Err("Unclosed vector".to_string())
-    }
-    
     fn execute_builtin(&mut self, name: &str) -> Result<(), String> {
         match name {
             "DUP" => self.op_dup(),
