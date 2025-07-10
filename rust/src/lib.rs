@@ -31,6 +31,32 @@ impl AjisaiInterpreter {
     }
 
     #[wasm_bindgen]
+    pub fn init_step(&mut self, code: &str) -> Result<String, String> {
+        match self.interpreter.init_step_execution(code) {
+            Ok(()) => Ok("OK".to_string()),
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    #[wasm_bindgen]
+    pub fn step(&mut self) -> Result<JsValue, String> {
+        match self.interpreter.execute_step() {
+            Ok(has_more) => {
+                let obj = js_sys::Object::new();
+                js_sys::Reflect::set(&obj, &"hasMore".into(), &JsValue::from_bool(has_more)).unwrap();
+                
+                if let Some((position, total)) = self.interpreter.get_step_info() {
+                    js_sys::Reflect::set(&obj, &"position".into(), &JsValue::from_f64(position as f64)).unwrap();
+                    js_sys::Reflect::set(&obj, &"total".into(), &JsValue::from_f64(total as f64)).unwrap();
+                }
+                
+                Ok(obj.into())
+            }
+            Err(e) => Err(e.to_string()),
+        }
+    }
+
+    #[wasm_bindgen]
     pub fn get_stack(&self) -> JsValue {
         let stack_values: Vec<JsValue> = self.interpreter
             .get_stack()
