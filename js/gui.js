@@ -138,6 +138,7 @@ const GUI = {
             { name: 'SWAP', description: '上位2つを交換 ( a b -- b a )' },
             { name: 'OVER', description: '2番目をコピー ( a b -- a b a )' },
             { name: 'ROT', description: '3番目を最上位へ ( a b c -- b c a )' },
+            { name: 'NIP', description: '2番目を削除 ( a b -- b )' },
             { name: '>R', description: 'スタックからレジスタへ移動 ( a -- )' },
             { name: 'R>', description: 'レジスタからスタックへ移動 ( -- a )' },
             { name: 'R@', description: 'レジスタの値をコピー ( -- a )' },
@@ -150,6 +151,8 @@ const GUI = {
             { name: 'NTH', description: 'N番目の要素を取得（負数は末尾から） ( n vec -- elem )' },
             { name: 'UNCONS', description: 'ベクトルを先頭要素と残りに分解 ( vec -- elem vec\' )' },
             { name: 'EMPTY?', description: 'ベクトルが空かチェック ( vec -- bool )' },
+            { name: 'MAP', description: '各要素に関数を適用 ( vec closure -- vec\' )' },
+            { name: 'FOLD', description: '左畳み込み ( vec init closure -- result )' },
             { name: 'DEF', description: '新しいワードを定義 ( vec str -- )' },
             { name: 'IF', description: '条件分岐 ( bool vec vec -- ... )' },
             { name: 'DEL', description: 'カスタムワードを削除 ( str -- )' }
