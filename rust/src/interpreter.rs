@@ -8,6 +8,10 @@ pub struct Interpreter {
     register: Register,
     dictionary: HashMap<String, WordDefinition>,
     dependencies: HashMap<String, HashSet<String>>, // word -> それを使用しているワードのセット
+    // ステップ実行用の状態
+    step_tokens: Vec<Token>,
+    step_position: usize,
+    step_mode: bool,
 }
 
 #[derive(Clone)]
@@ -24,6 +28,9 @@ impl Interpreter {
             register: None,
             dictionary: HashMap::new(),
             dependencies: HashMap::new(),
+            step_tokens: Vec::new(),
+            step_position: 0,
+            step_mode: false,
         };
         
         builtins::register_builtins(&mut interpreter.dictionary);
@@ -34,6 +41,120 @@ impl Interpreter {
     pub fn execute(&mut self, code: &str) -> Result<(), String> {
         let tokens = tokenize(code)?;
         self.execute_tokens_with_context(&tokens)?;
+        Ok(())
+    }
+
+    // ステップ実行の初期化
+    pub fn init_step_execution(&mut self, code: &str) -> Result<(), String> {
+        self.step_tokens = tokenize(code)?;
+        self.step_position = 0;
+        self.step_mode = true;
+        Ok(())
+    }
+
+    // 1ステップ実行
+    pub fn execute_step(&mut self) -> Result<bool, String> {
+        if !self.step_mode || self.step_position >= self.step_tokens.len() {
+            self.step_mode = false;
+            return Ok(false); // 実行完了
+        }
+
+        let token = self.step_tokens[self.step_position].clone();
+        self.step_position += 1;
+
+        // トークンを1つ実行
+        match self.execute_single_token(&token) {
+            Ok(_) => Ok(self.step_position < self.step_tokens.len()),
+            Err(e) => {
+                self.step_mode = false;
+                Err(e)
+            }
+        }
+    }
+
+    // ステップ実行の状態を取得
+    pub fn get_step_info(&self) -> Option<(usize, usize)> {
+        if self.step_mode {
+            Some((self.step_position, self.step_tokens.len()))
+        } else {
+            None
+        }
+    }
+
+    // 単一トークンの実行
+    fn execute_single_token(&mut self, token: &Token) -> Result<(), String> {
+        let mut pending_description: Option<String> = None;
+        
+        match token {
+            Token::Description(text) => {
+                pending_description = Some(text.clone());
+            },
+            Token::Number(num, den) => {
+                self.stack.push(Value {
+                    val_type: ValueType::Number(Fraction::new(*num, *den)),
+                });
+            },
+            Token::String(s) => {
+                self.stack.push(Value {
+                    val_type: ValueType::String(s.clone()),
+                });
+            },
+            Token::Boolean(b) => {
+                self.stack.push(Value {
+                    val_type: ValueType::Boolean(*b),
+                });
+            },
+            Token::Nil => {
+                self.stack.push(Value {
+                    val_type: ValueType::Nil,
+                });
+            },
+            Token::VectorStart => {
+                // ベクタを収集（ステップ実行時は一度に処理）
+                let mut depth = 1;
+                let mut vector_tokens = vec![Token::VectorStart];
+                
+                while depth > 0 && self.step_position < self.step_tokens.len() {
+                    let next_token = self.step_tokens[self.step_position].clone();
+                    self.step_position += 1;
+                    
+                    match &next_token {
+                        Token::VectorStart => depth += 1,
+                        Token::VectorEnd => depth -= 1,
+                        _ => {}
+                    }
+                    
+                    vector_tokens.push(next_token);
+                }
+                
+                // ベクタをデータとして解析
+                let (vector_values, _) = self.collect_vector_as_data(&vector_tokens)?;
+                self.stack.push(Value {
+                    val_type: ValueType::Vector(vector_values),
+                });
+            },
+            Token::Symbol(name) => {
+                if matches!(name.as_str(), "+" | "-" | "*" | "/" | ">" | ">=" | "=" | "<" | "<=") {
+                    self.execute_operator(name)?;
+                } else if let Some(def) = self.dictionary.get(name).cloned() {
+                    if def.is_builtin {
+                        if name == "DEF" {
+                            let desc = pending_description.take();
+                            self.op_def_with_comment(desc)?;
+                        } else {
+                            self.execute_builtin(name)?;
+                        }
+                    } else {
+                        // カスタムワードは展開して実行
+                        self.execute_tokens_with_context(&def.tokens)?;
+                    }
+                } else {
+                    return Err(format!("Unknown word: {}", name));
+                }
+            },
+            Token::VectorEnd => return Err("Unexpected ']' found.".to_string()),
+        }
+        
         Ok(())
     }
 
