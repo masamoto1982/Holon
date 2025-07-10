@@ -8,6 +8,7 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     register_builtin(dictionary, "SWAP", "上位2つを交換 ( a b -- b a )");
     register_builtin(dictionary, "OVER", "2番目をコピー ( a b -- a b a )");
     register_builtin(dictionary, "ROT", "3番目を最上位へ ( a b c -- b c a )");
+    register_builtin(dictionary, "NIP", "2番目を削除 ( a b -- b )");
     
     // レジスタ操作
     register_builtin(dictionary, ">R", "スタックからレジスタへ移動 ( a -- )");
@@ -26,6 +27,10 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     // スタックベース反復サポート（再帰の構成要素）
     register_builtin(dictionary, "UNCONS", "ベクトルを先頭要素と残りに分解 ( vec -- elem vec' )");
     register_builtin(dictionary, "EMPTY?", "ベクトルが空かチェック ( vec -- bool )");
+    
+    // 高階関数
+    register_builtin(dictionary, "MAP", "各要素に関数を適用 ( vec closure -- vec' )");
+    register_builtin(dictionary, "FOLD", "左畳み込み ( vec init closure -- result )");
     
     // 制御構造
     register_builtin(dictionary, "DEF", "新しいワードを定義 ( vec str -- )");
