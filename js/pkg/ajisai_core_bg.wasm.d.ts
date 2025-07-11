@@ -3,7 +3,7 @@
 export const memory: WebAssembly.Memory;
 export const __wbg_ajisaiinterpreter_free: (a: number, b: number) => void;
 export const ajisaiinterpreter_new: () => number;
-export const ajisaiinterpreter_execute: (a: number, b: number, c: number) => [number, number, number, number];
+export const ajisaiinterpreter_execute: (a: number, b: number, c: number) => [number, number, number];
 export const ajisaiinterpreter_init_step: (a: number, b: number, c: number) => [number, number, number, number];
 export const ajisaiinterpreter_step: (a: number) => [number, number, number];
 export const ajisaiinterpreter_get_stack: (a: number) => any;
