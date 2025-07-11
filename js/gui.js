@@ -153,16 +153,35 @@ const GUI = {
             });
             this.renderWordButtons(this.elements.customWordsDisplay, customWordInfos, true);
             
-            // ステップ情報を表示
-            if (stepResult.hasMore) {
-                const position = stepResult.position || 0;
-                const total = stepResult.total || 0;
-                this.elements.outputDisplay.textContent = 
-                    `Step ${position}/${total}: Press Ctrl+Enter to continue...`;
+            // 出力があれば追加表示
+            if (stepResult.output) {
+                const currentOutput = this.elements.outputDisplay.textContent;
+                // ステップ情報と出力を両方表示
+                if (stepResult.hasMore) {
+                    const position = stepResult.position || 0;
+                    const total = stepResult.total || 0;
+                    this.elements.outputDisplay.textContent = 
+                        stepResult.output + `\nStep ${position}/${total}: Press Ctrl+Enter to continue...`;
+                } else {
+                    // 実行完了時は出力のみ
+                    this.elements.outputDisplay.textContent = stepResult.output || 'OK (Step execution completed)';
+                }
             } else {
+                // ステップ情報を表示
+                if (stepResult.hasMore) {
+                    const position = stepResult.position || 0;
+                    const total = stepResult.total || 0;
+                    this.elements.outputDisplay.textContent = 
+                        `Step ${position}/${total}: Press Ctrl+Enter to continue...`;
+                } else {
+                    // 実行完了
+                    this.elements.outputDisplay.textContent = 'OK (Step execution completed)';
+                }
+            }
+            
+            if (!stepResult.hasMore) {
                 // 実行完了
                 this.stepMode = false;
-                this.elements.outputDisplay.textContent = 'OK (Step execution completed)';
                 this.elements.codeInput.value = '';
                 
                 // モバイルでは実行モードに切り替え
@@ -250,7 +269,14 @@ const GUI = {
             { name: 'FOLD', description: '左畳み込み ( vec init closure -- result )' },
             { name: 'DEF', description: '新しいワードを定義 ( vec str -- )' },
             { name: 'IF', description: '条件分岐 ( bool vec vec -- ... )' },
-            { name: 'DEL', description: 'カスタムワードを削除 ( str -- )' }
+            { name: 'DEL', description: 'カスタムワードを削除 ( str -- )' },
+            // 出力ワード
+            { name: '.', description: '値を出力してドロップ ( a -- )' },
+            { name: 'PRINT', description: '値を出力（ドロップしない） ( a -- a )' },
+            { name: 'CR', description: '改行を出力 ( -- )' },
+            { name: 'SPACE', description: 'スペースを出力 ( -- )' },
+            { name: 'SPACES', description: 'N個のスペースを出力 ( n -- )' },
+            { name: 'EMIT', description: '文字コードを文字として出力 ( n -- )' }
         ];
         this.renderWordButtons(this.elements.builtinWordsDisplay, builtinWords, false);
         
@@ -335,9 +361,10 @@ const GUI = {
             // コードを実行
             const result = window.ajisaiInterpreter.execute(code);
             
-            if (result === 'OK') {
-                // 成功時
-                this.elements.outputDisplay.textContent = 'OK';
+            if (result.status === 'OK') {
+                // 出力がある場合は表示、なければ'OK'
+                const output = result.output || '';
+                this.elements.outputDisplay.textContent = output || 'OK';
                 
                 // スタックを取得して表示
                 const stack = window.ajisaiInterpreter.get_stack();
@@ -348,25 +375,25 @@ const GUI = {
                 this.updateRegisterDisplay(this.convertWasmValue(register));
                 
                 // カスタムワードを更新（説明と保護状態付き）
-    const customWordsInfo = window.ajisaiInterpreter.get_custom_words_info();
-    console.log('Custom words info:', customWordsInfo);
-    console.log('First word data:', customWordsInfo[0]); // 最初の要素を詳しく見る
+                const customWordsInfo = window.ajisaiInterpreter.get_custom_words_info();
+                console.log('Custom words info:', customWordsInfo);
+                console.log('First word data:', customWordsInfo[0]); // 最初の要素を詳しく見る
 
-    const customWordInfos = customWordsInfo.map(wordData => {
-        // wordDataが配列の場合: [名前, 説明, 保護状態]
-        if (Array.isArray(wordData)) {
-            console.log('Word data array:', wordData); // 配列の中身を表示
-            const info = {
-                name: wordData[0],
-                description: wordData[1] || null,
-                protected: wordData[2] || false
-            };
-            console.log('Processed info:', info);
-            return info;
-        } else {
-            return wordData;
-        }
-    });
+                const customWordInfos = customWordsInfo.map(wordData => {
+                    // wordDataが配列の場合: [名前, 説明, 保護状態]
+                    if (Array.isArray(wordData)) {
+                        console.log('Word data array:', wordData); // 配列の中身を表示
+                        const info = {
+                            name: wordData[0],
+                            description: wordData[1] || null,
+                            protected: wordData[2] || false
+                        };
+                        console.log('Processed info:', info);
+                        return info;
+                    } else {
+                        return wordData;
+                    }
+                });
                 this.renderWordButtons(this.elements.customWordsDisplay, customWordInfos, true);
                 
                 // 成功時はテキストエディタをクリア
@@ -377,7 +404,7 @@ const GUI = {
                     this.setMode('execution');
                 }
             } else {
-                // エラー時
+                // エラー時（文字列が返ってきた場合）
                 this.elements.outputDisplay.textContent = result;
                 // エラー時はテキストエディタの内容を保持
             }
