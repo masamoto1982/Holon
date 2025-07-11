@@ -55,6 +55,7 @@ impl AjisaiInterpreter {
             Err(e) => Err(e.to_string()),
         }
     }
+}
 
     #[wasm_bindgen]
     pub fn get_stack(&self) -> JsValue {
