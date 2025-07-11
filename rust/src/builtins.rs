@@ -54,6 +54,14 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     
     // 論理演算子
     register_builtin(dictionary, "NOT", "論理否定 ( bool -- bool )");
+
+    // 出力
+    register_builtin(dictionary, ".", "値を出力してドロップ ( a -- )");
+    register_builtin(dictionary, "PRINT", "値を出力（ドロップしない） ( a -- a )");
+    register_builtin(dictionary, "CR", "改行を出力 ( -- )");
+    register_builtin(dictionary, "SPACE", "スペースを出力 ( -- )");
+    register_builtin(dictionary, "SPACES", "N個のスペースを出力 ( n -- )");
+    register_builtin(dictionary, "EMIT", "文字コードを文字として出力 ( n -- )");
 }
 
 fn register_builtin(dictionary: &mut HashMap<String, WordDefinition>, name: &str, description: &str) {
