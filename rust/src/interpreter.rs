@@ -336,8 +336,6 @@ impl Interpreter {
             "NTH" => self.op_nth(),
             "UNCONS" => self.op_uncons(),
             "EMPTY?" => self.op_empty(),
-            "MAP" => self.op_map(),
-            "FOLD" => self.op_fold(),
             "DEL" => self.op_del(),
             "NOT" => self.op_not(),
             // 出力ワード
@@ -550,16 +548,61 @@ impl Interpreter {
         }
     }
     
+    // 暗黙の反復を実装した新しい演算子
     fn op_add(&mut self) -> Result<(), String> {
         if self.stack.len() < 2 { return Err("Stack underflow".to_string()); }
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
+        
         match (&a.val_type, &b.val_type) {
+            // スカラー + スカラー（従来通り）
             (ValueType::Number(n1), ValueType::Number(n2)) => {
                 self.stack.push(Value { val_type: ValueType::Number(n1.add(n2)) });
                 Ok(())
             },
-            _ => Err("Type error: + requires two numbers".to_string()),
+            // Vector + スカラー（ブロードキャスト）
+            (ValueType::Vector(v), ValueType::Number(n)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Number(en.add(n))
+                        },
+                        _ => elem.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            // スカラー + Vector（ブロードキャスト）
+            (ValueType::Number(n), ValueType::Vector(v)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Number(n.add(en))
+                        },
+                        _ => elem.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            // Vector + Vector（要素ごと）
+            (ValueType::Vector(v1), ValueType::Vector(v2)) => {
+                if v1.len() != v2.len() {
+                    return Err("Vector length mismatch".to_string());
+                }
+                let result: Vec<Value> = v1.iter().zip(v2.iter())
+                    .map(|(a, b)| match (&a.val_type, &b.val_type) {
+                        (ValueType::Number(n1), ValueType::Number(n2)) => Value {
+                            val_type: ValueType::Number(n1.add(n2))
+                        },
+                        _ => a.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            _ => Err("Type error: + requires numbers or vectors".to_string()),
         }
     }
     
@@ -567,12 +610,52 @@ impl Interpreter {
         if self.stack.len() < 2 { return Err("Stack underflow".to_string()); }
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
+        
         match (&a.val_type, &b.val_type) {
             (ValueType::Number(n1), ValueType::Number(n2)) => {
                 self.stack.push(Value { val_type: ValueType::Number(n1.sub(n2)) });
                 Ok(())
             },
-            _ => Err("Type error: - requires two numbers".to_string()),
+            (ValueType::Vector(v), ValueType::Number(n)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Number(en.sub(n))
+                        },
+                        _ => elem.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Number(n), ValueType::Vector(v)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Number(n.sub(en))
+                        },
+                        _ => elem.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Vector(v1), ValueType::Vector(v2)) => {
+                if v1.len() != v2.len() {
+                    return Err("Vector length mismatch".to_string());
+                }
+                let result: Vec<Value> = v1.iter().zip(v2.iter())
+                    .map(|(a, b)| match (&a.val_type, &b.val_type) {
+                        (ValueType::Number(n1), ValueType::Number(n2)) => Value {
+                            val_type: ValueType::Number(n1.sub(n2))
+                        },
+                        _ => a.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            _ => Err("Type error: - requires numbers or vectors".to_string()),
         }
     }
     
@@ -580,12 +663,52 @@ impl Interpreter {
         if self.stack.len() < 2 { return Err("Stack underflow".to_string()); }
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
+        
         match (&a.val_type, &b.val_type) {
             (ValueType::Number(n1), ValueType::Number(n2)) => {
                 self.stack.push(Value { val_type: ValueType::Number(n1.mul(n2)) });
                 Ok(())
             },
-            _ => Err("Type error: * requires two numbers".to_string()),
+            (ValueType::Vector(v), ValueType::Number(n)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Number(en.mul(n))
+                        },
+                        _ => elem.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Number(n), ValueType::Vector(v)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Number(n.mul(en))
+                        },
+                        _ => elem.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Vector(v1), ValueType::Vector(v2)) => {
+                if v1.len() != v2.len() {
+                    return Err("Vector length mismatch".to_string());
+                }
+                let result: Vec<Value> = v1.iter().zip(v2.iter())
+                    .map(|(a, b)| match (&a.val_type, &b.val_type) {
+                        (ValueType::Number(n1), ValueType::Number(n2)) => Value {
+                            val_type: ValueType::Number(n1.mul(n2))
+                        },
+                        _ => a.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            _ => Err("Type error: * requires numbers or vectors".to_string()),
         }
     }
     
@@ -593,25 +716,106 @@ impl Interpreter {
         if self.stack.len() < 2 { return Err("Stack underflow".to_string()); }
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
+        
         match (&a.val_type, &b.val_type) {
             (ValueType::Number(n1), ValueType::Number(n2)) => {
                 self.stack.push(Value { val_type: ValueType::Number(n1.div(n2)) });
                 Ok(())
             },
-            _ => Err("Type error: / requires two numbers".to_string()),
+            (ValueType::Vector(v), ValueType::Number(n)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Number(en.div(n))
+                        },
+                        _ => elem.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Number(n), ValueType::Vector(v)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Number(n.div(en))
+                        },
+                        _ => elem.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Vector(v1), ValueType::Vector(v2)) => {
+                if v1.len() != v2.len() {
+                    return Err("Vector length mismatch".to_string());
+                }
+                let result: Vec<Value> = v1.iter().zip(v2.iter())
+                    .map(|(a, b)| match (&a.val_type, &b.val_type) {
+                        (ValueType::Number(n1), ValueType::Number(n2)) => Value {
+                            val_type: ValueType::Number(n1.div(n2))
+                        },
+                        _ => a.clone()
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            _ => Err("Type error: / requires numbers or vectors".to_string()),
         }
     }
     
+    // 比較演算子も暗黙の反復に対応
     fn op_gt(&mut self) -> Result<(), String> {
         if self.stack.len() < 2 { return Err("Stack underflow".to_string()); }
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
+        
         match (&a.val_type, &b.val_type) {
             (ValueType::Number(n1), ValueType::Number(n2)) => {
                 self.stack.push(Value { val_type: ValueType::Boolean(n1.gt(n2)) });
                 Ok(())
             },
-            _ => Err("Type error: > requires two numbers".to_string()),
+            (ValueType::Vector(v), ValueType::Number(n)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Boolean(en.gt(n))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Number(n), ValueType::Vector(v)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Boolean(n.gt(en))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Vector(v1), ValueType::Vector(v2)) => {
+                if v1.len() != v2.len() {
+                    return Err("Vector length mismatch".to_string());
+                }
+                let result: Vec<Value> = v1.iter().zip(v2.iter())
+                    .map(|(a, b)| match (&a.val_type, &b.val_type) {
+                        (ValueType::Number(n1), ValueType::Number(n2)) => Value {
+                            val_type: ValueType::Boolean(n1.gt(n2))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            _ => Err("Type error: > requires numbers or vectors".to_string()),
         }
     }
     
@@ -619,12 +823,52 @@ impl Interpreter {
         if self.stack.len() < 2 { return Err("Stack underflow".to_string()); }
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
+        
         match (&a.val_type, &b.val_type) {
             (ValueType::Number(n1), ValueType::Number(n2)) => {
                 self.stack.push(Value { val_type: ValueType::Boolean(n1.ge(n2)) });
                 Ok(())
             },
-            _ => Err("Type error: >= requires two numbers".to_string()),
+            (ValueType::Vector(v), ValueType::Number(n)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Boolean(en.ge(n))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Number(n), ValueType::Vector(v)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Boolean(n.ge(en))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Vector(v1), ValueType::Vector(v2)) => {
+                if v1.len() != v2.len() {
+                    return Err("Vector length mismatch".to_string());
+                }
+                let result: Vec<Value> = v1.iter().zip(v2.iter())
+                    .map(|(a, b)| match (&a.val_type, &b.val_type) {
+                        (ValueType::Number(n1), ValueType::Number(n2)) => Value {
+                            val_type: ValueType::Boolean(n1.ge(n2))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            _ => Err("Type error: >= requires numbers or vectors".to_string()),
         }
     }
     
@@ -632,29 +876,97 @@ impl Interpreter {
         if self.stack.len() < 2 { return Err("Stack underflow".to_string()); }
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
-        let result = match (&a.val_type, &b.val_type) {
-            (ValueType::Number(n1), ValueType::Number(n2)) => n1.eq(n2),
-            (ValueType::String(s1), ValueType::String(s2)) => s1 == s2,
-            (ValueType::Boolean(b1), ValueType::Boolean(b2)) => b1 == b2,
-            (ValueType::Symbol(s1), ValueType::Symbol(s2)) => s1 == s2,
-            (ValueType::Nil, ValueType::Nil) => true,
-            (ValueType::Vector(v1), ValueType::Vector(v2)) => v1 == v2,
-            _ => false,
-        };
-        self.stack.push(Value { val_type: ValueType::Boolean(result) });
-        Ok(())
+        
+        // =演算子はVectorの比較もサポートするが、暗黙の反復も行う
+        match (&a.val_type, &b.val_type) {
+            // スカラー同士（従来通り）
+            (ValueType::Number(n1), ValueType::Number(n2)) => {
+                self.stack.push(Value { val_type: ValueType::Boolean(n1.eq(n2)) });
+                Ok(())
+            },
+            (ValueType::String(s1), ValueType::String(s2)) => {
+                self.stack.push(Value { val_type: ValueType::Boolean(s1 == s2) });
+                Ok(())
+            },
+            (ValueType::Boolean(b1), ValueType::Boolean(b2)) => {
+                self.stack.push(Value { val_type: ValueType::Boolean(b1 == b2) });
+                Ok(())
+            },
+            (ValueType::Symbol(s1), ValueType::Symbol(s2)) => {
+                self.stack.push(Value { val_type: ValueType::Boolean(s1 == s2) });
+                Ok(())
+            },
+            (ValueType::Nil, ValueType::Nil) => {
+                self.stack.push(Value { val_type: ValueType::Boolean(true) });
+                Ok(())
+            },
+            // Vector全体の比較
+            (ValueType::Vector(v1), ValueType::Vector(v2)) => {
+                if v1.len() == v2.len() && v1 == v2 {
+                    self.stack.push(Value { val_type: ValueType::Boolean(true) });
+                } else {
+                    self.stack.push(Value { val_type: ValueType::Boolean(false) });
+                }
+                Ok(())
+            },
+            // 異なる型の場合はfalse
+            _ => {
+                self.stack.push(Value { val_type: ValueType::Boolean(false) });
+                Ok(())
+            },
+        }
     }
     
     fn op_lt(&mut self) -> Result<(), String> {
         if self.stack.len() < 2 { return Err("Stack underflow".to_string()); }
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
+        
         match (&a.val_type, &b.val_type) {
             (ValueType::Number(n1), ValueType::Number(n2)) => {
                 self.stack.push(Value { val_type: ValueType::Boolean(n1.lt(n2)) });
                 Ok(())
             },
-            _ => Err("Type error: < requires two numbers".to_string()),
+            (ValueType::Vector(v), ValueType::Number(n)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Boolean(en.lt(n))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Number(n), ValueType::Vector(v)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Boolean(n.lt(en))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Vector(v1), ValueType::Vector(v2)) => {
+                if v1.len() != v2.len() {
+                    return Err("Vector length mismatch".to_string());
+                }
+                let result: Vec<Value> = v1.iter().zip(v2.iter())
+                    .map(|(a, b)| match (&a.val_type, &b.val_type) {
+                        (ValueType::Number(n1), ValueType::Number(n2)) => Value {
+                            val_type: ValueType::Boolean(n1.lt(n2))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            _ => Err("Type error: < requires numbers or vectors".to_string()),
         }
     }
     
@@ -662,12 +974,52 @@ impl Interpreter {
         if self.stack.len() < 2 { return Err("Stack underflow".to_string()); }
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
+        
         match (&a.val_type, &b.val_type) {
             (ValueType::Number(n1), ValueType::Number(n2)) => {
                 self.stack.push(Value { val_type: ValueType::Boolean(n1.le(n2)) });
                 Ok(())
             },
-            _ => Err("Type error: <= requires two numbers".to_string()),
+            (ValueType::Vector(v), ValueType::Number(n)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Boolean(en.le(n))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Number(n), ValueType::Vector(v)) => {
+                let result: Vec<Value> = v.iter()
+                    .map(|elem| match &elem.val_type {
+                        ValueType::Number(en) => Value {
+                            val_type: ValueType::Boolean(n.le(en))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            (ValueType::Vector(v1), ValueType::Vector(v2)) => {
+                if v1.len() != v2.len() {
+                    return Err("Vector length mismatch".to_string());
+                }
+                let result: Vec<Value> = v1.iter().zip(v2.iter())
+                    .map(|(a, b)| match (&a.val_type, &b.val_type) {
+                        (ValueType::Number(n1), ValueType::Number(n2)) => Value {
+                            val_type: ValueType::Boolean(n1.le(n2))
+                        },
+                        _ => Value { val_type: ValueType::Boolean(false) }
+                    })
+                    .collect();
+                self.stack.push(Value { val_type: ValueType::Vector(result) });
+                Ok(())
+            },
+            _ => Err("Type error: <= requires numbers or vectors".to_string()),
         }
     }
     
@@ -844,83 +1196,23 @@ impl Interpreter {
                     self.stack.push(Value { val_type: ValueType::Boolean(!b) });
                     Ok(())
                 },
-                _ => Err("Type error: NOT requires a boolean".to_string()),
+                // Vectorに対してもNOTを適用（暗黙の反復）
+                ValueType::Vector(v) => {
+                    let result: Vec<Value> = v.iter()
+                        .map(|elem| match &elem.val_type {
+                            ValueType::Boolean(b) => Value {
+                                val_type: ValueType::Boolean(!b)
+                            },
+                            _ => elem.clone()
+                        })
+                        .collect();
+                    self.stack.push(Value { val_type: ValueType::Vector(result) });
+                    Ok(())
+                },
+                _ => Err("Type error: NOT requires a boolean or vector of booleans".to_string()),
             }
         } else {
             Err("Stack underflow".to_string())
-        }
-    }
-    
-    fn op_map(&mut self) -> Result<(), String> {
-        if self.stack.len() < 2 {
-            return Err("Stack underflow for MAP".to_string());
-        }
-        
-        let closure_val = self.stack.pop().unwrap();
-        let vec_val = self.stack.pop().unwrap();
-        
-        match (&vec_val.val_type, &closure_val.val_type) {
-            (ValueType::Vector(vec), ValueType::Vector(closure)) => {
-                let mut result = Vec::new();
-                
-                for element in vec {
-                    // 各要素をスタックにプッシュ
-                    self.stack.push(element.clone());
-                    
-                    // クロージャを実行
-                    let (tokens, _) = self.body_vector_to_tokens(closure)?;
-                    self.execute_tokens_with_context(&tokens)?;
-                    
-                    // 結果をスタックから取得
-                    if let Some(mapped_val) = self.stack.pop() {
-                        result.push(mapped_val);
-                    } else {
-                        return Err("MAP: closure must produce a value".to_string());
-                    }
-                }
-                
-                self.stack.push(Value { val_type: ValueType::Vector(result) });
-                Ok(())
-            },
-            _ => Err("Type error: MAP requires a vector and a closure vector".to_string()),
-        }
-    }
-    
-    fn op_fold(&mut self) -> Result<(), String> {
-        if self.stack.len() < 3 {
-            return Err("Stack underflow for FOLD".to_string());
-        }
-        
-        let closure_val = self.stack.pop().unwrap();
-        let init_val = self.stack.pop().unwrap();
-        let vec_val = self.stack.pop().unwrap();
-        
-        match (&vec_val.val_type, &closure_val.val_type) {
-            (ValueType::Vector(vec), ValueType::Vector(closure)) => {
-                // 初期値をアキュムレータとして開始
-                let mut accumulator = init_val;
-                
-                for element in vec {
-                    // スタックに: accumulator element
-                    self.stack.push(accumulator);
-                    self.stack.push(element.clone());
-                    
-                    // クロージャを実行
-                    let (tokens, _) = self.body_vector_to_tokens(closure)?;
-                    self.execute_tokens_with_context(&tokens)?;
-                    
-                    // 結果を新しいアキュムレータとして取得
-                    if let Some(new_acc) = self.stack.pop() {
-                        accumulator = new_acc;
-                    } else {
-                        return Err("FOLD: closure must produce a value".to_string());
-                    }
-                }
-                
-                self.stack.push(accumulator);
-                Ok(())
-            },
-            _ => Err("Type error: FOLD requires a vector, initial value, and closure vector".to_string()),
         }
     }
     
