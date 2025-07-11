@@ -23,9 +23,18 @@ impl AjisaiInterpreter {
     }
 
     #[wasm_bindgen]
-    pub fn execute(&mut self, code: &str) -> Result<String, String> {
+    pub fn execute(&mut self, code: &str) -> Result<JsValue, String> {
         match self.interpreter.execute(code) {
-            Ok(()) => Ok("OK".to_string()),
+            Ok(()) => {
+                let obj = js_sys::Object::new();
+                js_sys::Reflect::set(&obj, &"status".into(), &"OK".into()).unwrap();
+                
+                // 出力を取得
+                let output = self.interpreter.get_output();
+                js_sys::Reflect::set(&obj, &"output".into(), &output.into()).unwrap();
+                
+                Ok(obj.into())
+            }
             Err(e) => Err(e.to_string()),
         }
     }
@@ -50,12 +59,15 @@ impl AjisaiInterpreter {
                     js_sys::Reflect::set(&obj, &"total".into(), &JsValue::from_f64(total as f64)).unwrap();
                 }
                 
+                // 出力を取得
+                let output = self.interpreter.get_output();
+                js_sys::Reflect::set(&obj, &"output".into(), &output.into()).unwrap();
+                
                 Ok(obj.into())
             }
             Err(e) => Err(e.to_string()),
         }
     }
-}
 
     #[wasm_bindgen]
     pub fn get_stack(&self) -> JsValue {
@@ -121,46 +133,6 @@ impl AjisaiInterpreter {
         self.interpreter = Interpreter::new();
     }
 }
-
-#[wasm_bindgen]
-    pub fn execute(&mut self, code: &str) -> Result<JsValue, String> {
-        match self.interpreter.execute(code) {
-            Ok(()) => {
-                let obj = js_sys::Object::new();
-                js_sys::Reflect::set(&obj, &"status".into(), &"OK".into()).unwrap();
-                
-                // 出力を取得
-                let output = self.interpreter.get_output();
-                js_sys::Reflect::set(&obj, &"output".into(), &output.into()).unwrap();
-                
-                Ok(obj.into())
-            }
-            Err(e) => Err(e.to_string()),
-        }
-    }
-    
-    // ステップ実行も同様に修正
-    #[wasm_bindgen]
-    pub fn step(&mut self) -> Result<JsValue, String> {
-        match self.interpreter.execute_step() {
-            Ok(has_more) => {
-                let obj = js_sys::Object::new();
-                js_sys::Reflect::set(&obj, &"hasMore".into(), &JsValue::from_bool(has_more)).unwrap();
-                
-                if let Some((position, total)) = self.interpreter.get_step_info() {
-                    js_sys::Reflect::set(&obj, &"position".into(), &JsValue::from_f64(position as f64)).unwrap();
-                    js_sys::Reflect::set(&obj, &"total".into(), &JsValue::from_f64(total as f64)).unwrap();
-                }
-                
-                // 出力を取得
-                let output = self.interpreter.get_output();
-                js_sys::Reflect::set(&obj, &"output".into(), &output.into()).unwrap();
-                
-                Ok(obj.into())
-            }
-            Err(e) => Err(e.to_string()),
-        }
-    }
 
 fn value_to_js(value: &Value) -> JsValue {
     let obj = js_sys::Object::new();
