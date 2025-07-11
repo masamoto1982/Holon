@@ -28,10 +28,6 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     register_builtin(dictionary, "UNCONS", "ベクトルを先頭要素と残りに分解 ( vec -- elem vec' )");
     register_builtin(dictionary, "EMPTY?", "ベクトルが空かチェック ( vec -- bool )");
     
-    // 高階関数
-    register_builtin(dictionary, "MAP", "各要素に関数を適用 ( vec closure -- vec' )");
-    register_builtin(dictionary, "FOLD", "左畳み込み ( vec init closure -- result )");
-    
     // 制御構造
     register_builtin(dictionary, "DEF", "新しいワードを定義 ( vec str -- )");
     register_builtin(dictionary, "IF", "条件分岐 ( bool vec vec -- ... )");
@@ -39,21 +35,21 @@ pub fn register_builtins(dictionary: &mut HashMap<String, WordDefinition>) {
     // 辞書操作
     register_builtin(dictionary, "DEL", "カスタムワードを削除 ( str -- )");
     
-    // 算術演算子
-    register_builtin(dictionary, "+", "加算 ( a b -- a+b )");
-    register_builtin(dictionary, "-", "減算 ( a b -- a-b )");
-    register_builtin(dictionary, "*", "乗算 ( a b -- a*b )");
-    register_builtin(dictionary, "/", "除算 ( a b -- a/b )");
+    // 算術演算子（暗黙の反復対応）
+    register_builtin(dictionary, "+", "加算 - 暗黙の反復対応 ( a b -- a+b )");
+    register_builtin(dictionary, "-", "減算 - 暗黙の反復対応 ( a b -- a-b )");
+    register_builtin(dictionary, "*", "乗算 - 暗黙の反復対応 ( a b -- a*b )");
+    register_builtin(dictionary, "/", "除算 - 暗黙の反復対応 ( a b -- a/b )");
     
-    // 比較演算子
-    register_builtin(dictionary, ">", "より大きい ( a b -- bool )");
-    register_builtin(dictionary, ">=", "以上 ( a b -- bool )");
+    // 比較演算子（暗黙の反復対応）
+    register_builtin(dictionary, ">", "より大きい - 暗黙の反復対応 ( a b -- bool )");
+    register_builtin(dictionary, ">=", "以上 - 暗黙の反復対応 ( a b -- bool )");
     register_builtin(dictionary, "=", "等しい ( a b -- bool )");
-    register_builtin(dictionary, "<", "より小さい ( a b -- bool )");
-    register_builtin(dictionary, "<=", "以下 ( a b -- bool )");
+    register_builtin(dictionary, "<", "より小さい - 暗黙の反復対応 ( a b -- bool )");
+    register_builtin(dictionary, "<=", "以下 - 暗黙の反復対応 ( a b -- bool )");
     
-    // 論理演算子
-    register_builtin(dictionary, "NOT", "論理否定 ( bool -- bool )");
+    // 論理演算子（暗黙の反復対応）
+    register_builtin(dictionary, "NOT", "論理否定 - 暗黙の反復対応 ( bool -- bool )");
 
     // 出力
     register_builtin(dictionary, ".", "値を出力してドロップ ( a -- )");
