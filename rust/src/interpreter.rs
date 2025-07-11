@@ -12,6 +12,8 @@ pub struct Interpreter {
     step_tokens: Vec<Token>,
     step_position: usize,
     step_mode: bool,
+    // 出力バッファ
+    output_buffer: String,
 }
 
 #[derive(Clone)]
@@ -31,6 +33,7 @@ impl Interpreter {
             step_tokens: Vec::new(),
             step_position: 0,
             step_mode: false,
+            output_buffer: String::new(),
         };
         
         builtins::register_builtins(&mut interpreter.dictionary);
@@ -42,6 +45,18 @@ impl Interpreter {
         let tokens = tokenize(code)?;
         self.execute_tokens_with_context(&tokens)?;
         Ok(())
+    }
+
+    // 出力バッファを取得してクリア
+    pub fn get_output(&mut self) -> String {
+        let output = self.output_buffer.clone();
+        self.output_buffer.clear();
+        output
+    }
+    
+    // 出力バッファに追加
+    fn append_output(&mut self, text: &str) {
+        self.output_buffer.push_str(text);
     }
 
     // ステップ実行の初期化
@@ -325,6 +340,13 @@ impl Interpreter {
             "FOLD" => self.op_fold(),
             "DEL" => self.op_del(),
             "NOT" => self.op_not(),
+            // 出力ワード
+            "." => self.op_dot(),
+            "PRINT" => self.op_print(),
+            "CR" => self.op_cr(),
+            "SPACE" => self.op_space(),
+            "SPACES" => self.op_spaces(),
+            "EMIT" => self.op_emit(),
             _ => Err(format!("Unknown builtin: {}", name)),
         }
     }
@@ -909,6 +931,75 @@ impl Interpreter {
                     self.delete_word(&name.to_uppercase())
                 },
                 _ => Err("Type error: DEL requires a string".to_string()),
+            }
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    // 出力ワードの実装
+    fn op_dot(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            self.append_output(&val.to_string());
+            self.append_output(" ");
+            Ok(())
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    fn op_print(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.last() {
+            self.append_output(&val.to_string());
+            self.append_output(" ");
+            Ok(())
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    fn op_cr(&mut self) -> Result<(), String> {
+        self.append_output("\n");
+        Ok(())
+    }
+    
+    fn op_space(&mut self) -> Result<(), String> {
+        self.append_output(" ");
+        Ok(())
+    }
+    
+    fn op_spaces(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            match val.val_type {
+                ValueType::Number(n) => {
+                    if n.denominator == 1 && n.numerator >= 0 {
+                        let spaces = " ".repeat(n.numerator as usize);
+                        self.append_output(&spaces);
+                        Ok(())
+                    } else {
+                        Err("SPACES requires a non-negative integer".to_string())
+                    }
+                },
+                _ => Err("Type error: SPACES requires a number".to_string()),
+            }
+        } else {
+            Err("Stack underflow".to_string())
+        }
+    }
+    
+    fn op_emit(&mut self) -> Result<(), String> {
+        if let Some(val) = self.stack.pop() {
+            match val.val_type {
+                ValueType::Number(n) => {
+                    if n.denominator == 1 && n.numerator >= 0 && n.numerator <= 127 {
+                        let ch = n.numerator as u8 as char;
+                        self.append_output(&ch.to_string());
+                        Ok(())
+                    } else {
+                        Err("EMIT requires an ASCII code (0-127)".to_string())
+                    }
+                },
+                _ => Err("Type error: EMIT requires a number".to_string()),
             }
         } else {
             Err("Stack underflow".to_string())
