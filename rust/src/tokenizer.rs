@@ -98,6 +98,9 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
             continue;
         }
         
+        // デバッグログ
+        web_sys::console::log_1(&format!("Tokenizing word: '{}'", word).into());
+        
         // 数値の判定（整数と小数）
         if let Ok(num) = word.parse::<i64>() {
             tokens.push(Token::Number(num, 1));
@@ -105,16 +108,39 @@ pub fn tokenize(input: &str) -> Result<Vec<Token>, String> {
             // 小数点を含む場合、分数に変換
             let parts: Vec<&str> = word.split('.').collect();
             if parts.len() == 2 {
-                if let (Ok(integer), Ok(decimal)) = (parts[0].parse::<i64>(), parts[1].parse::<i64>()) {
-                    let decimal_places = parts[1].len() as u32;
-                    let denominator = 10_i64.pow(decimal_places);
-                    let numerator = integer * denominator + decimal;
-                    tokens.push(Token::Number(numerator, denominator));
-                } else {
-                    return Err(format!("Invalid number: {}", word));
-                }
+                // 整数部と小数部を別々に処理
+                let integer_part = if parts[0].is_empty() { 0 } else { 
+                    parts[0].parse::<i64>().map_err(|_| format!("Invalid number: {}", word))? 
+                };
+                let decimal_part = if parts[1].is_empty() { 0 } else {
+                    parts[1].parse::<i64>().map_err(|_| format!("Invalid number: {}", word))?
+                };
+                
+                let decimal_places = parts[1].len() as u32;
+                let denominator = 10_i64.pow(decimal_places);
+                let numerator = integer_part * denominator + decimal_part;
+                
+                web_sys::console::log_1(&format!("Parsed decimal {} as fraction {}/{}", word, numerator, denominator).into());
+                tokens.push(Token::Number(numerator, denominator));
             } else {
                 return Err(format!("Invalid number: {}", word));
+            }
+        } else if word.contains('/') {
+            // 分数記法（例: 1/2）
+            let parts: Vec<&str> = word.split('/').collect();
+            if parts.len() == 2 {
+                let numerator = parts[0].parse::<i64>()
+                    .map_err(|_| format!("Invalid fraction numerator: {}", word))?;
+                let denominator = parts[1].parse::<i64>()
+                    .map_err(|_| format!("Invalid fraction denominator: {}", word))?;
+                
+                if denominator == 0 {
+                    return Err("Division by zero in fraction".to_string());
+                }
+                
+                tokens.push(Token::Number(numerator, denominator));
+            } else {
+                return Err(format!("Invalid fraction: {}", word));
             }
         } else {
             // その他のトークン
