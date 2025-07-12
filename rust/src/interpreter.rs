@@ -554,6 +554,8 @@ impl Interpreter {
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
         
+        web_sys::console::log_1(&format!("op_add: a={:?}, b={:?}", a, b).into());
+        
         match (&a.val_type, &b.val_type) {
             // スカラー + スカラー（従来通り）
             (ValueType::Number(n1), ValueType::Number(n2)) => {
@@ -602,7 +604,11 @@ impl Interpreter {
                 self.stack.push(Value { val_type: ValueType::Vector(result) });
                 Ok(())
             },
-            _ => Err("Type error: + requires numbers or vectors".to_string()),
+            // その他の型の組み合わせは元のまま返す（エラーにはしない）
+            _ => {
+                self.stack.push(a);
+                Ok(())
+            }
         }
     }
     
@@ -655,7 +661,10 @@ impl Interpreter {
                 self.stack.push(Value { val_type: ValueType::Vector(result) });
                 Ok(())
             },
-            _ => Err("Type error: - requires numbers or vectors".to_string()),
+            _ => {
+                self.stack.push(a);
+                Ok(())
+            }
         }
     }
     
@@ -663,6 +672,8 @@ impl Interpreter {
         if self.stack.len() < 2 { return Err("Stack underflow".to_string()); }
         let b = self.stack.pop().unwrap();
         let a = self.stack.pop().unwrap();
+        
+        web_sys::console::log_1(&format!("op_mul: a={:?}, b={:?}", a, b).into());
         
         match (&a.val_type, &b.val_type) {
             (ValueType::Number(n1), ValueType::Number(n2)) => {
@@ -708,7 +719,10 @@ impl Interpreter {
                 self.stack.push(Value { val_type: ValueType::Vector(result) });
                 Ok(())
             },
-            _ => Err("Type error: * requires numbers or vectors".to_string()),
+            _ => {
+                self.stack.push(a);
+                Ok(())
+            }
         }
     }
     
@@ -761,7 +775,10 @@ impl Interpreter {
                 self.stack.push(Value { val_type: ValueType::Vector(result) });
                 Ok(())
             },
-            _ => Err("Type error: / requires numbers or vectors".to_string()),
+            _ => {
+                self.stack.push(a);
+                Ok(())
+            }
         }
     }
     
@@ -815,7 +832,10 @@ impl Interpreter {
                 self.stack.push(Value { val_type: ValueType::Vector(result) });
                 Ok(())
             },
-            _ => Err("Type error: > requires numbers or vectors".to_string()),
+            _ => {
+                self.stack.push(a);
+                Ok(())
+            }
         }
     }
     
@@ -868,7 +888,10 @@ impl Interpreter {
                 self.stack.push(Value { val_type: ValueType::Vector(result) });
                 Ok(())
             },
-            _ => Err("Type error: >= requires numbers or vectors".to_string()),
+            _ => {
+                self.stack.push(a);
+                Ok(())
+            }
         }
     }
     
@@ -966,7 +989,10 @@ impl Interpreter {
                 self.stack.push(Value { val_type: ValueType::Vector(result) });
                 Ok(())
             },
-            _ => Err("Type error: < requires numbers or vectors".to_string()),
+            _ => {
+                self.stack.push(a);
+                Ok(())
+            }
         }
     }
     
@@ -1019,7 +1045,10 @@ impl Interpreter {
                 self.stack.push(Value { val_type: ValueType::Vector(result) });
                 Ok(())
             },
-            _ => Err("Type error: <= requires numbers or vectors".to_string()),
+            _ => {
+                self.stack.push(a);
+                Ok(())
+            }
         }
     }
     
@@ -1167,6 +1196,7 @@ impl Interpreter {
         }
     }
     
+    // IFワードに暗黙の反復を追加
     fn op_if(&mut self) -> Result<(), String> {
         if self.stack.len() < 3 {
             return Err("Stack underflow for IF".to_string());
@@ -1176,16 +1206,35 @@ impl Interpreter {
         let then_branch = self.stack.pop().unwrap();
         let condition = self.stack.pop().unwrap();
         
+        web_sys::console::log_1(&format!("op_if: condition={:?}, then={:?}, else={:?}", 
+                                         condition, then_branch, else_branch).into());
+        
         match (&condition.val_type, &then_branch.val_type, &else_branch.val_type) {
+            // 通常のIF（スカラーの真偽値）
             (ValueType::Boolean(cond), ValueType::Vector(then_vec), ValueType::Vector(else_vec)) => {
                 let vec_to_execute = if *cond { then_vec } else { else_vec };
-                
                 let (tokens, _) = self.body_vector_to_tokens(vec_to_execute)?;
-                
                 self.execute_tokens_with_context(&tokens)?;
                 Ok(())
             },
-            _ => Err("Type error: IF requires a boolean and two vectors".to_string()),
+            // Vectorの真偽値に対する暗黙の反復
+            (ValueType::Vector(cond_vec), ValueType::Vector(then_vec), ValueType::Vector(else_vec)) => {
+                // 各条件に対してIFを実行
+                for cond_val in cond_vec {
+                    match &cond_val.val_type {
+                        ValueType::Boolean(cond) => {
+                            let vec_to_execute = if *cond { then_vec } else { else_vec };
+                            let (tokens, _) = self.body_vector_to_tokens(vec_to_execute)?;
+                            self.execute_tokens_with_context(&tokens)?;
+                        },
+                        _ => {
+                            // 真偽値でない要素はスキップ
+                        }
+                    }
+                }
+                Ok(())
+            },
+            _ => Err("Type error: IF requires a boolean (or vector of booleans) and two vectors".to_string()),
         }
     }
 
@@ -1229,10 +1278,19 @@ impl Interpreter {
         }
     }
     
-    // 出力ワードの実装
+    // 出力ワードの実装（修正版）
     fn op_dot(&mut self) -> Result<(), String> {
         if let Some(val) = self.stack.pop() {
-            self.append_output(&val.to_string());
+            match &val.val_type {
+                ValueType::Vector(_) => {
+                    // Vectorの場合は各要素を出力
+                    self.append_output(&val.to_string());
+                },
+                _ => {
+                    // スカラーの場合は通常通り
+                    self.append_output(&val.to_string());
+                }
+            }
             self.append_output(" ");
             Ok(())
         } else {
